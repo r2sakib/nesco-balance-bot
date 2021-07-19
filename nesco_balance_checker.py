@@ -2,16 +2,18 @@ from bs4 import BeautifulSoup
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.options import Options
 
 url = 'https://prepaid.nesco.gov.bd'
-cust_no = '71050717'
 
 
 def build_browser():
+    driver_exe = './chromedriver.exe'
     options = webdriver.ChromeOptions()
-    options.add_argument("headless")
-    return webdriver.Chrome(executable_path='./chromedriver.exe')
+    options = Options()
+    options.add_argument("--headless")
+    driver = webdriver.Chrome(driver_exe, options=options)
+    return driver
     
 
 ### Sending input and getting result page
@@ -53,17 +55,6 @@ def get_time(soup):
     
 ### Parsing last payment info
 
-
-def check_balance():
-    soup = BeautifulSoup(get_page(cust_no), 'lxml')
-    return f'''
-	Customer no. : {cust_no}
-	Customer name: {get_name(soup)}\n
-
-	Remaining balance: ৳ {get_balance(soup)}
-	Updated on: {get_time(soup)}
-	'''
-
 def get_last_recharge(soup):
     table_rows = soup.findAll('tr')
 
@@ -72,28 +63,39 @@ def get_last_recharge(soup):
     	data.append(table_cell.text)
 
     return {
-			'token': data[2],
-			'enammount': data[8],
-			'reammount': data[9],
+			'token': data[1],
+			'enamount': data[8],
+			'reamount': data[9],
 			'unit': data[10], 
 			'method': data[11],
 			'date': data[12],
 			'remote': data[13],
     }
 
-def check_last_recharge():
+
+### Genereting outputs
+def check_balance(cust_no):
+    soup = BeautifulSoup(get_page(cust_no), 'lxml')
+    b = get_balance(soup)
+    return f'''
+	Customer no. :       *{cust_no}*\nCustomer name:   *{get_name(soup)}*\n
+
+	Remaining balance:   *৳ {b}*
+	Updated on:   *{get_time(soup)}*
+	''', b
+
+def check_last_recharge(cust_no):
 	soup = BeautifulSoup(get_page(cust_no), 'lxml')
 	x = get_last_recharge(soup)
 	return f'''
-	Customer no. : {cust_no}
-	Customer name: {get_name(soup)}\n
+	Customer no. :       *{cust_no}*\nCustomer name:   *{get_name(soup)}*\n
 
-	Date: {x['date']}
-	Recharge ammount: ৳ {x['reammount']}
-	Energy ammount: ৳ {x['enammount']}
-	Unit (kWh): {x['unit']}
-	Payment method: {x['method']}
-	Remote payment: {x['remote']}
+	Date:   *{x['date']}*
+	Recharge amount:    *৳ {x['reamount']}*
+	Energy amount:         *৳ {x['enamount']}*
+	Unit (kWh):                   *{x['unit']}*
+	Payment method:     *{x['method']}*
+	Remote payment:     *{x['remote']}*\nToken:   *{x['token']}*
 	'''
 
-print(check_last_recharge())
+# print(check_balance(71050717))
