@@ -1,37 +1,21 @@
 from bs4 import BeautifulSoup
-
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
-
-url = 'https://prepaid.nesco.gov.bd'
-
-
-def build_browser():
-    driver_exe = './chromedriver.exe'
-    options = webdriver.ChromeOptions()
-    options = Options()
-    options.add_argument("--headless")
-    driver = webdriver.Chrome(driver_exe, options=options)
-    return driver
+import mechanize
     
 
 ### Sending input and getting result page
 def get_page(cust_no):
 
-    browser = build_browser()
-    browser.get(url)
-    cust_id_input = browser.find_element_by_id('cust_no')
+    br = mechanize.Browser()
 
-    cust_id_input.clear()
-    cust_id_input.send_keys(cust_no)
-    cust_id_input.send_keys(Keys.RETURN)
+    response = br.open("http://prepaid.nesco.gov.bd/")
+    br.addheaders = [('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'), ('Accept', '*/*')]
 
-    result_page_source = browser.find_element_by_xpath("//html").get_attribute('outerHTML')
+    br.select_form(id='customer-form')
+    br['cust_no'] = str(cust_no)
 
-    browser.quit()
+    response = br.submit()
 
-    return result_page_source
+    return response
 
 
 ### Parsing balance and customer name
@@ -95,7 +79,7 @@ def check_last_recharge(cust_no):
 	Energy amount:         *৳ {x['enamount']}*
 	Unit (kWh):                   *{x['unit']}*
 	Payment method:     *{x['method']}*
-	Remote payment:     *{x['remote']}*\nToken:   *{x['token']}*
+	Remote payment:     *{x['remote']}*\n Token:   *{x['token']}*
 	'''
 
-# print(check_balance(71050717))
+print(check_balance(71050717))

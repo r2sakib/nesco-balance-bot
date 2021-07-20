@@ -52,7 +52,7 @@ def notify(message):
 
 
 @bot.message_handler(commands=['notify_daily'])
-def notify(message):
+def notify_daily(message):
     global command_name
     command_name = 'notify_daily'
     bot.send_message(message.chat.id, 'Enter a customer number.')
@@ -244,8 +244,8 @@ def echo(message):
 def notifier_time(): 
     while True:
         if datetime.datetime.now().hour == 00 and datetime.datetime.now().minute > 30:
-            notifier(3600)
-        # time.sleep(3600)
+            notifier()
+        time.sleep(3600)
 
 # bot.polling()
 
