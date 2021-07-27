@@ -6,6 +6,8 @@ import mechanize
 def get_page(cust_no):
 
     br = mechanize.Browser()
+    br.set_handle_robots(False)
+    br.set_handle_equiv(False)
 
     response = br.open("http://prepaid.nesco.gov.bd/")
     br.addheaders = [('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'), ('Accept', '*/*')]
@@ -31,7 +33,7 @@ def get_balance(soup):
     return remaining_balance
 
 def get_time(soup):
-    updated_on = soup.select_one('small[style*="red"]').text
+    updated_on = soup.select_one('small[style*="black"]').text
     updated_on = updated_on.replace('(Time: ', '').replace(')', '').replace(':00 ', '')
 
     return updated_on
@@ -47,13 +49,13 @@ def get_last_recharge(soup):
     	data.append(table_cell.text)
 
     return {
-			'token': data[1],
-			'enamount': data[8],
-			'reamount': data[9],
-			'unit': data[10], 
-			'method': data[11],
-			'date': data[12],
-			'remote': data[13],
+			'token': data[0],
+			'enamount': data[7],
+			'reamount': data[8],
+			'unit': data[9], 
+			'method': data[10],
+			'date': data[11],
+			'remote': data[12],
     }
 
 
@@ -81,5 +83,3 @@ def check_last_recharge(cust_no):
 	Payment method:     *{x['method']}*
 	Remote payment:     *{x['remote']}*\n Token:   *{x['token']}*
 	'''
-
-print(check_balance(71050717))

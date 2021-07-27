@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 
 import nesco_balance_checker as main
 
+
+
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
 
@@ -69,10 +71,12 @@ def last_rechrage_default(message):
         bot.send_message(message.chat.id, 'Enter a customer number.  (This step is only for initialization)')
     else:
         msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory('recharge', message=message, cust_no=x)[0]
+        response = balance_rechargeHistory('recharge', message=message, cust_no=x)
 
         if response != False:
-            bot.edit_message_text(response, message.chat.id, msg.message_id)
+            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
+        else:
+            bot.edit_message_text('Please try again.', message.chat.id, msg.message_id)
 
 
 @bot.message_handler(commands=['balance_default'])
@@ -86,10 +90,12 @@ def balance_default(message):
         bot.send_message(message.chat.id, 'Enter a customer number.  (This step is only for initialization)')
     else:
         msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory('balance', message=message, cust_no=x)[0]
+        response = balance_rechargeHistory('balance', message=message, cust_no=x)
 
         if response != False:
-            bot.edit_message_text(response, message.chat.id, msg.message_id)
+            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
+        else:
+            bot.edit_message_text('Please try again.', message.chat.id, msg.message_id)
 
 
 def balance_rechargeHistory(type, **kwargs):
@@ -112,7 +118,7 @@ def balance_rechargeHistory(type, **kwargs):
 
 
 def check_database(ID, type):
-    con = sqlite3.connect('data.db')
+    con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
     db = con.cursor()
 
     x = db.execute(f'SELECT * FROM user_data WHERE id = {ID}; ')
@@ -128,7 +134,7 @@ def check_database(ID, type):
 
 def notifier():
 
-    con = sqlite3.connect('data.db')
+    con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
     db = con.cursor()
 
     t = ['notify', 'notify_daily']
@@ -159,10 +165,10 @@ def echo(message):
     if command_name == 'balance' or command_name == 'recharge':
 
         msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory(command_name, message=message)[0]
+        response = balance_rechargeHistory(command_name, message=message)
 
         if response != False:
-            bot.edit_message_text(response, message.chat.id, msg.message_id)
+            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
             # bot.send_message(message.chat.id, response)
         else:
             bot.edit_message_text('Enter a valid customer number, or try again.', message.chat.id, msg.message_id)
@@ -172,7 +178,7 @@ def echo(message):
 
         m = message.chat
 
-        con = sqlite3.connect('data.db')
+        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
         db = con.cursor()
 
         try:
@@ -190,7 +196,7 @@ def echo(message):
 
         m = message.chat
 
-        con = sqlite3.connect('data.db')
+        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
         db = con.cursor()
 
         try:
@@ -209,7 +215,7 @@ def echo(message):
 
         m = message.chat
 
-        con = sqlite3.connect('data.db')
+        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
         db = con.cursor()
 
         try:
@@ -227,7 +233,7 @@ def echo(message):
 
         m = message.chat
 
-        con = sqlite3.connect('data.db')
+        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
         db = con.cursor()
 
         try:
@@ -243,11 +249,12 @@ def echo(message):
 
 def notifier_time(): 
     while True:
-        if datetime.datetime.now().hour == 00 and datetime.datetime.now().minute > 30:
+        if datetime.datetime.now().hour == 1 and datetime.datetime.now().minute > 00:
             notifier()
-        time.sleep(3600)
+        else:
+            print(datetime.datetime.now().hour, datetime.datetime.now().minute)
+        time.sleep(1800)
 
-# bot.polling()
 
 botthread = threading.Thread(target=bot.polling)
 botthread.start()
