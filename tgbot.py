@@ -1,35 +1,29 @@
 import telebot
 import os
-from telebot.types import Message
-from urllib3 import request
 import sqlite3
-import datetime
+from datetime import datetime
 import time
 import threading
-import os
 from dotenv import load_dotenv
+# from keep_alive import keep_alive
 
-import nesco_balance_checker as main
-
-
+import data_collector 
 
 load_dotenv()
-API_KEY = os.getenv('API_KEY')
+API_KEY = os.environ['API_KEY']
 
-bot = telebot.TeleBot(API_KEY, parse_mode='MARKDOWN')
+bot = telebot.TeleBot(API_KEY, parse_mode='HTML')
 
 command_name = ''
+db_path = "data.db"
+
+staring_message = "/balance - Check current balance\n/balance_default - Check current balance with preset customer no.\n/last_recharge - Check last recharge details\n/last_recharge_default - Check last recharge details with preset customer no.\n/notify - Get balance update if balance is less than ৳100\n/notify_daily - Get balance update daily at 06:00 AM"
 
 @bot.message_handler(commands=['start'])
-def balance(message):
+def start(message):
     global command_name
-    command_name = 'balance'
-    bot.send_message(message.chat.id, '''/balance - Check current balance\n
-/balance_default - Check current balance with preset customer no.\n
-/last_recharge - Check last recharge details\n
-/last_recharge_default - Check last recharge details with preset customer no.\n
-/notify - Notify if balance is less than ৳ 100\n
-/notify_daily - Get balance update daily at 12:00 AM''')
+    command_name = 'start'
+    bot.send_message(message.chat.id, staring_message)
 
 
 @bot.message_handler(commands=['balance'])
@@ -107,18 +101,18 @@ def balance_rechargeHistory(type, **kwargs):
 
     if type == 'recharge':
         try:
-            return (main.check_last_recharge(cust_no), None)
+            return (data_collector.check_last_recharge(cust_no), None)
         except:
             return False
     else:
         try:
-            return main.check_balance(cust_no)
+            return data_collector.check_balance(cust_no)
         except:
             return False
 
 
 def check_database(ID, type):
-    con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
+    con = sqlite3.connect(db_path)
     db = con.cursor()
 
     x = db.execute(f'SELECT * FROM user_data WHERE id = {ID}; ')
@@ -134,7 +128,7 @@ def check_database(ID, type):
 
 def notifier():
 
-    con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
+    con = sqlite3.connect(db_path)
     db = con.cursor()
 
     t = ['notify', 'notify_daily']
@@ -152,9 +146,10 @@ def notifier():
             if len(chat_ids) > 0:
                 response = balance_rechargeHistory('balance', cust_no=cust_nos[j])
 
-                if i == 'notify' and float(response[1]) < 100: 
+                if i == 'notify': 
                     bot.send_message(chat_ids[j], response)
-                elif i == 'notify_daily':
+                  
+                if i == 'notify_daily':
                     bot.send_message(chat_ids[j], response)
 
 
@@ -162,6 +157,9 @@ def notifier():
 
 @bot.message_handler()
 def echo(message):
+    if command_name == 'start':
+      bot.send_message(message.chat.id, )
+    
     if command_name == 'balance' or command_name == 'recharge':
 
         msg = bot.send_message(message.chat.id, 'Getting data...')
@@ -178,67 +176,63 @@ def echo(message):
 
         m = message.chat
 
-        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
+        con = sqlite3.connect(db_path)
         db = con.cursor()
 
         try:
-            db.execute(f'''INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) 
-                        VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)''')
+            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
         except sqlite3.IntegrityError:
             db.execute(f'UPDATE user_data SET notify=1 WHERE id={m.id}')
 
         con.commit()
         con.close()
-        bot.send_message(message.chat.id, 'Setup success! You will get a message if remaining balance is less than ৳ 100.')
+        bot.send_message(message.chat.id, 'Setup success! You will get a message if remaining balance balance is less than ৳100.')
     
 
     if command_name == 'notify_daily':
 
         m = message.chat
 
-        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
+        con = sqlite3.connect(db_path)
         db = con.cursor()
 
         try:
-            db.execute(f'''INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) 
-                        VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)''')
+            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
         except sqlite3.IntegrityError:
             db.execute(f'UPDATE user_data SET notify_daily=1 WHERE id={m.id}')
             db.execute(f'UPDATE user_data SET customer_id={message.text} WHERE id={m.id}')
 
         con.commit()
         con.close()
-        bot.send_message(message.chat.id, 'Setup success! You will get a message eveyday at 12:00 AM.')
+        bot.send_message(message.chat.id, 'Setup success! You will get a balance update eveyday at 06:00 AM.')
 
 
     if command_name == 'last_recharge_default':
 
         m = message.chat
 
-        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
+        con = sqlite3.connect(db_path)
         db = con.cursor()
 
         try:
-            db.execute(f'''INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) 
-                        VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)''')
+            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
         except sqlite3.IntegrityError:
             db.execute(f'UPDATE user_data SET default_recharge=1 WHERE id={m.id}')
             db.execute(f'UPDATE user_data SET customer_id={message.text} WHERE id={m.id}')
         con.commit()
         con.close()
-        bot.send_message(message.chat.id, '''Setup success! Just send the command next time to see last recharge history without entering customer no.''')
+        bot.send_message(message.chat.id, "Setup success! Just send the command next time to see last recharge history without entering customer no.")
 
 
     if command_name == 'balance_default':
 
         m = message.chat
 
-        con = sqlite3.connect(r'E:\codes\nesco_balance_checker\data.db')
+        con = sqlite3.connect(db_path)
         db = con.cursor()
 
         try:
-            db.execute(f'''INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) 
-                        VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)''')
+            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
         except sqlite3.IntegrityError:
             db.execute(f'UPDATE user_data SET default_balance=1 WHERE id={m.id}')
             db.execute(f'UPDATE user_data SET customer_id={message.text} WHERE id={m.id}')
@@ -249,15 +243,22 @@ def echo(message):
 
 def notifier_time(): 
     while True:
-        if datetime.datetime.now().hour == 1 and datetime.datetime.now().minute > 00:
+        if datetime.now().hour == 00 and datetime.now().minute > 00:
             notifier()
+            time.sleep(3600)
         else:
-            print(datetime.datetime.now().hour, datetime.datetime.now().minute)
+            print(datetime.now().hour, datetime.now().minute, sep=':')
         time.sleep(1800)
 
+
+# keep_alive()
 
 botthread = threading.Thread(target=bot.polling)
 botthread.start()
     
 notifierthread = threading.Thread(target=notifier_time)
 notifierthread.start()
+
+while True:
+  print(datetime.now().hour, datetime.now().minute, sep=':')
+  time.sleep(60)
