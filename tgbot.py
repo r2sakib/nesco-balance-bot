@@ -149,7 +149,7 @@ def notifier():
                 if i == 'notify' and float(response[1]) < 100: 
                     bot.send_message(chat_ids[j], response)
                   
-                if i == 'notify_daily':
+                if i == 'notify_daily' and float(response[1]) > 100:
                     bot.send_message(chat_ids[j], response)
 
 
