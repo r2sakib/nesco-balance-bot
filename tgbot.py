@@ -146,7 +146,7 @@ def notifier():
             if len(chat_ids) > 0:
                 response = balance_rechargeHistory('balance', cust_no=cust_nos[j])
 
-                if i == 'notify': 
+                if i == 'notify' and float(response[1]) < 100: 
                     bot.send_message(chat_ids[j], response)
                   
                 if i == 'notify_daily':
