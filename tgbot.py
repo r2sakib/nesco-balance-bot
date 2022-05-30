@@ -247,8 +247,7 @@ def notifier_time():
             notifier()
             time.sleep(3600)
         else:
-            print(datetime.now().hour, datetime.now().minute, sep=':')
-        time.sleep(1800)
+            time.sleep(1800)
 
 
 # keep_alive()
