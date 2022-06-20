@@ -63,23 +63,41 @@ def get_last_recharge(soup):
 def check_balance(cust_no):
     soup = BeautifulSoup(get_page(cust_no), 'lxml')
     b = get_balance(soup)
-    return f'''
-	Customer no. :       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
 
-	Remaining balance:   <b>৳{b}</b>
-	Updated on:   <b>{get_time(soup)}</b>
+    cust_name = get_name(soup)
+    if cust_name == 'MOST. ZESMIN ARA KHATUN':
+        cust_name = 'JESMIN ARA'
+    
+    return f'''
+    <b><u>Balance info</u></b>
+  Customer no.:       <b>{cust_no}</b>
+  Customer name:  <b>{cust_name}</b>
+    
+  Remaining balance:   <b>৳{b}</b>
+  Updated on:   <b>{get_time(soup)}</b>
 	''', b
 
 def check_last_recharge(cust_no):
 	soup = BeautifulSoup(get_page(cust_no), 'lxml')
 	x = get_last_recharge(soup)
-	return f'''
-	Customer no. :       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
+	token = x['token']
+	token = token.replace('\n\n\t\t\t\t\t\t\t\t\t\t\t', '')
+	token = token.replace('\n', '')
 
-	Date:   <b>{x['date']}</b>
-	Recharge amount:    <b>৳{x['reamount']}</b>
-	Energy amount:         <b>৳{x['enamount']}</b>
-	Unit (kWh):                   <b>{x['unit']}</b>
-	Payment method:     <b>{x['method']}</b>
-	Remote payment:     <b>{x['remote']}</b>\n Token:  *{x['token']}</b>
+	cust_name = get_name(soup)
+	if cust_name == 'MOST. ZESMIN ARA KHATUN':
+		cust_name = 'JESMIN ARA'
+
+	return f'''
+    <b><u>Last recharge info</u></b>
+  Customer no.:       <b>{cust_no}</b>
+  Customer name:  <b>{cust_name}</b>
+  
+  Date:   <b>{x['date']}</b>
+  Recharge amount:   <b>৳{x['reamount']}</b>
+  Energy amount:        <b>৳{x['enamount']}</b>
+  Unit (kWh):                 <b>{x['unit']}</b>
+  Payment method:     <b>{x['method']}</b>
+  Remote payment:     <b>{x['remote']}</b>
+  Token: <b>{token}</b>
 	'''
