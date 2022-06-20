@@ -17,13 +17,13 @@ bot = telebot.TeleBot(API_KEY, parse_mode='HTML')
 command_name = ''
 db_path = "data.db"
 
-staring_message = "/balance - Check current balance\n/balance_default - Check current balance with preset customer no.\n/last_recharge - Check last recharge details\n/last_recharge_default - Check last recharge details with preset customer no.\n/notify - Get balance update if balance is less than ৳100\n/notify_daily - Get balance update daily at 06:00 AM"
+starting_message = "/balance - Check current balance\n/balance_default - Check current balance with preset customer no.\n/last_recharge - Check last recharge details\n/last_recharge_default - Check last recharge details with preset customer no.\n/notify - Get balance update if balance is less than ৳100\n/notify_daily - Get balance update daily at 06:00 AM"
 
 @bot.message_handler(commands=['start'])
 def start(message):
     global command_name
     command_name = 'start'
-    bot.send_message(message.chat.id, staring_message)
+    bot.send_message(message.chat.id, starting_message)
 
 
 @bot.message_handler(commands=['balance'])
@@ -158,7 +158,7 @@ def notifier():
 @bot.message_handler()
 def echo(message):
     if command_name == 'start':
-      bot.send_message(message.chat.id, )
+      bot.send_message(message.chat.id, starting_message)
     
     if command_name == 'balance' or command_name == 'recharge':
 

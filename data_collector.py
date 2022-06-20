@@ -64,7 +64,7 @@ def check_balance(cust_no):
     soup = BeautifulSoup(get_page(cust_no), 'lxml')
     b = get_balance(soup)
     return f'''
-	Customer no. :       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
+	Customer no.:       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
 
 	Remaining balance:   <b>৳{b}</b>
 	Updated on:   <b>{get_time(soup)}</b>
@@ -74,7 +74,7 @@ def check_last_recharge(cust_no):
 	soup = BeautifulSoup(get_page(cust_no), 'lxml')
 	x = get_last_recharge(soup)
 	return f'''
-	Customer no. :       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
+	Customer no.:       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
 
 	Date:   <b>{x['date']}</b>
 	Recharge amount:    <b>৳{x['reamount']}</b>
