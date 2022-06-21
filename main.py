@@ -250,14 +250,9 @@ def notifier_time():
             time.sleep(1800)
 
 
-# keep_alive()
 
 botthread = threading.Thread(target=bot.polling)
 botthread.start()
     
 notifierthread = threading.Thread(target=notifier_time)
 notifierthread.start()
-
-while True:
-  print(datetime.now().hour, datetime.now().minute, sep=':')
-  time.sleep(60)
