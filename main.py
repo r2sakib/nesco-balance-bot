@@ -18,6 +18,111 @@ db_path = "data.db"
 
 starting_message = "/balance - Check current balance\n/balance_default - Check current balance with preset customer no.\n/last_recharge - Check last recharge details\n/last_recharge_default - Check last recharge details with preset customer no.\n/notify - Get balance update if balance is less than ৳100\n/notify_daily - Get balance update daily at 06:00 AM"
 
+
+def message_formatter(type: str, cust_no) -> str:
+    
+    if type == 'balance':
+        try:
+            info = data_collector.check_balance(cust_no)
+
+            message = f'''
+                <b><u>Balance info</u></b>
+    Customer no.:       <b>{info['cust_no']}</b>
+    Customer name:  <b>{info['cust_name']}</b>
+        
+    Remaining balance:   <b>৳{info['balance']}</b>
+    Updated on:   <b>{info['time']}</b>'''
+
+            return message
+        
+        except:
+            return False
+
+    elif type == 'recharge':
+        try:
+            info = data_collector.check_last_recharge(cust_no)
+
+            message = f'''
+                <b><u>Last recharge info</u></b>
+    Customer no.:       <b>{info['cust_no']}</b>
+    Customer name:  <b>{info['cust_name']}</b>
+    
+    Date:   <b>{info['info']['date']}</b>
+    Recharge amount:   <b>৳{info['info']['re_amount']}</b>
+    Energy amount:        <b>৳{info['info']['en_amount']}</b>
+    Unit (kWh):                 <b>{info['info']['unit']}</b>
+    Payment method:     <b>{info['info']['method']}</b>
+    Remote payment:     <b>{info['info']['remote']}</b>
+    Token: <b>{info['info']['token']}</b>'''
+
+            return message
+        
+        except:
+            return False
+
+    elif type == 'low_balance':
+        try:
+            info = data_collector.check_balance(cust_no)
+
+            message = f'''
+                <b><u>LOW BALANCE</u></b>
+            Customer no.:       <b>{info['cust_no']}</b>
+            Customer name:  <b>{info['cust_name']}</b>
+                
+            Remaining balance:   <b>৳{info['balance']}</b>
+            Updated on:   <b>{info['time']}</b>'''
+
+            return message
+        
+        except:
+            return False
+
+
+def check_database(ID, type):
+    con = sqlite3.connect(db_path)
+    db = con.cursor()
+
+    x = db.execute(f'SELECT * FROM user_data WHERE id = {ID}; ')
+
+    for row in x:
+        if row[0] == ID and row[type] == 1:
+            return row[2]
+        else:
+            return None
+
+    con.close()
+
+
+def notifier():
+
+    con = sqlite3.connect(db_path)
+    db = con.cursor()
+
+    t = ['notify', 'notify_daily']
+    for i in t:
+        x = db.execute(f'SELECT * FROM user_data WHERE {i}=1')
+    
+        cust_nos = []
+        chat_ids = []
+        for row in x:
+            cust_nos.append(row[2])
+            chat_ids.append(row[0])
+
+
+        for j in range(len(chat_ids)):
+            if len(chat_ids) > 0:
+
+                balance = data_collector.get_balance(cust_no=cust_nos[j])
+
+                if i == 'notify' and float(balance) < 100: 
+                    response = message_formatter('low_balance', cust_nos[j])
+                    bot.send_message(chat_ids[j], response)
+                  
+                if i == 'notify_daily' and float(balance) > 100:
+                    response = message_formatter('balance', cust_nos[j])
+                    bot.send_message(chat_ids[j], response)
+
+
 @bot.message_handler(commands=['start'])
 def start(message):
     global command_name
@@ -89,113 +194,6 @@ def balance_default(message):
             bot.edit_message_text(response, message.chat.id, msg.message_id)
         else:
             bot.edit_message_text('Please try again.', message.chat.id, msg.message_id)
-
-
-def message_formatter(type: str, cust_no) -> str:
-    
-    if type == 'balance':
-        try:
-            info = data_collector.check_balance(cust_no)
-
-            message = f'''
-                <b><u>Balance info</u></b>
-    Customer no.:       <b>{info['cust_no']}</b>
-    Customer name:  <b>{info['cust_name']}</b>
-        
-    Remaining balance:   <b>৳{info['balance']}</b>
-    Updated on:   <b>{info['time']}</b>'''
-
-            return message
-        
-        except:
-            return False
-
-    elif type == 'recharge':
-        try:
-            info = data_collector.check_last_recharge(cust_no)
-
-            message = f'''
-                <b><u>Last recharge info</u></b>
-    Customer no.:       <b>{info['cust_no']}</b>
-    Customer name:  <b>{info['cust_name']}</b>
-    
-    Date:   <b>{info['info']['date']}</b>
-    Recharge amount:   <b>৳{info['info']['re_amount']}</b>
-    Energy amount:        <b>৳{info['info']['en_amount']}</b>
-    Unit (kWh):                 <b>{info['info']['unit']}</b>
-    Payment method:     <b>{info['info']['method']}</b>
-    Remote payment:     <b>{info['info']['remote']}</b>
-    Token: <b>{info['info']['token']}</b>'''
-
-            return message
-        
-        except:
-            return False
-
-    elif type == 'low_balance':
-        try:
-            info = data_collector.check_balance(cust_no)
-
-            message = f'''
-                <b><u>LOW BALANCE</u></b>
-            Customer no.:       <b>{info['cust_no']}</b>
-            Customer name:  <b>{info['cust_name']}</b>
-                
-            Remaining balance:   <b>৳{info['balance']}</b>
-            Updated on:   <b>{info['time']}</b>'''
-
-            return message
-        
-        except:
-            return False
-
-
-
-def check_database(ID, type):
-    con = sqlite3.connect(db_path)
-    db = con.cursor()
-
-    x = db.execute(f'SELECT * FROM user_data WHERE id = {ID}; ')
-
-    for row in x:
-        if row[0] == ID and row[type] == 1:
-            return row[2]
-        else:
-            return None
-
-    con.close()
-
-
-def notifier():
-
-    con = sqlite3.connect(db_path)
-    db = con.cursor()
-
-    t = ['notify', 'notify_daily']
-    for i in t:
-        x = db.execute(f'SELECT * FROM user_data WHERE {i}=1')
-    
-        cust_nos = []
-        chat_ids = []
-        for row in x:
-            cust_nos.append(row[2])
-            chat_ids.append(row[0])
-
-
-        for j in range(len(chat_ids)):
-            if len(chat_ids) > 0:
-
-                balance = data_collector.get_balance(cust_no=cust_nos[j])
-
-                if i == 'notify' and float(balance) < 100: 
-                    response = message_formatter('low_balance', cust_nos[j])
-                    bot.send_message(chat_ids[j], response)
-                  
-                if i == 'notify_daily' and float(balance) > 100:
-                    response = message_formatter('balance', cust_nos[j])
-                    bot.send_message(chat_ids[j], response)
-
-
 
 
 @bot.message_handler()
