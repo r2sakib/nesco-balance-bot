@@ -28,14 +28,9 @@ def get_name(soup):
 
     return name
 
-<<<<<<< HEAD
-def get_balance(soup) -> str:
-    remaining_balance = soup.select_one('input[style*="bold"]')['value']
-=======
 def get_balance(soup=None, cust_no=None) -> str:
     if soup == None:
         soup = BeautifulSoup(get_page(cust_no), 'lxml')
->>>>>>> dev
 
     remaining_balance = soup.select_one('input[style*="bold"]')['value']
     return remaining_balance
@@ -55,11 +50,7 @@ def get_last_recharge(soup):
 
 	data = []
 	for table_cell in table_rows[1]:
-<<<<<<< HEAD
-		data.append(table_cell.teinfo['info'])
-=======
 		data.append(table_cell.text)
->>>>>>> dev
 
 	return {
 			'token': data[0],
@@ -76,22 +67,6 @@ def get_last_recharge(soup):
 def check_balance(cust_no: Union[int, str]) -> dict:
 
     soup = BeautifulSoup(get_page(cust_no), 'lxml')
-<<<<<<< HEAD
-    b = get_balance(soup)
-
-    cust_name = get_name(soup)
-    if cust_name == 'MOST. ZESMIN ARA KHATUN':
-        cust_name = 'JESMIN ARA'
-    
-    return f'''
-    <b><u>Balance info</u></b>
-  Customer no.:       <b>{cust_no}</b>
-  Customer name:  <b>{cust_name}</b>
-    
-  Remaining balance:   <b>৳{b}</b>
-  Updated on:   <b>{get_time(soup)}</b>
-	''', b
-=======
     balance = get_balance(soup=soup)
 
     cust_name = get_name(soup)
@@ -109,43 +84,18 @@ def check_balance(cust_no: Union[int, str]) -> dict:
 
 
 def check_last_recharge(cust_no: Union[int, str]) -> dict:
->>>>>>> dev
 
 	soup = BeautifulSoup(get_page(cust_no), 'lxml')
-<<<<<<< HEAD
-	x = get_last_recharge(soup)
-	token = x['token']
-	token = token.replace('\n\n\t\t\t\t\t\t\t\t\t\t\t', '')
-	token = token.replace('\n', '')
-=======
 	recharge_info = get_last_recharge(soup)
 	token = recharge_info['token']
 	token = token.replace('\n\n\t\t\t\t\t\t\t\t\t\t\t', '').replace('\n', '')
 	recharge_info['token'] = token
->>>>>>> dev
 
 	cust_name = get_name(soup)
 	if cust_name == 'MOST. ZESMIN ARA KHATUN':
 		cust_name = 'JESMIN ARA'
-<<<<<<< HEAD
-
-	return f'''
-    <b><u>Last recharge info</u></b>
-  Customer no.:       <b>{cust_no}</b>
-  Customer name:  <b>{cust_name}</b>
-  
-  Date:   <b>{x['date']}</b>
-  Recharge amount:   <b>৳{x['reamount']}</b>
-  Energy amount:        <b>৳{x['enamount']}</b>
-  Unit (kWh):                 <b>{x['unit']}</b>
-  Payment method:     <b>{x['method']}</b>
-  Remote payment:     <b>{x['remote']}</b>
-  Token: <b>{token}</b>
-	'''
-=======
         
 	return {
         'cust_no': cust_no,
         'cust_name': cust_name,
         'info': recharge_info}
->>>>>>> dev
