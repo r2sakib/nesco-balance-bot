@@ -37,7 +37,7 @@ def get_balance(soup=None, cust_no=None) -> str:
 
 
 def get_time(soup):
-    updated_on = soup.select_one('small[style*="black"]').teinfo['info']
+    updated_on = soup.select_one('small[style*="black"]').text
     updated_on = updated_on.replace('(সময়ঃ ', '').replace(')', '').replace(':00 ', '')
 
     return updated_on
