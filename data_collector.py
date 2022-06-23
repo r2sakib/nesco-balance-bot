@@ -28,10 +28,18 @@ def get_name(soup):
 
     return name
 
+<<<<<<< HEAD
 def get_balance(soup) -> str:
     remaining_balance = soup.select_one('input[style*="bold"]')['value']
+=======
+def get_balance(soup=None, cust_no=None) -> str:
+    if soup == None:
+        soup = BeautifulSoup(get_page(cust_no), 'lxml')
+>>>>>>> dev
 
+    remaining_balance = soup.select_one('input[style*="bold"]')['value']
     return remaining_balance
+
 
 def get_time(soup):
     updated_on = soup.select_one('small[style*="black"]').teinfo['info']
@@ -47,7 +55,11 @@ def get_last_recharge(soup):
 
 	data = []
 	for table_cell in table_rows[1]:
+<<<<<<< HEAD
 		data.append(table_cell.teinfo['info'])
+=======
+		data.append(table_cell.text)
+>>>>>>> dev
 
 	return {
 			'token': data[0],
@@ -61,8 +73,10 @@ def get_last_recharge(soup):
 
 
 ### Genereting outputs
-def check_balance(cust_no):
+def check_balance(cust_no: Union[int, str]) -> dict:
+
     soup = BeautifulSoup(get_page(cust_no), 'lxml')
+<<<<<<< HEAD
     b = get_balance(soup)
 
     cust_name = get_name(soup)
@@ -77,17 +91,43 @@ def check_balance(cust_no):
   Remaining balance:   <b>৳{b}</b>
   Updated on:   <b>{get_time(soup)}</b>
 	''', b
+=======
+    balance = get_balance(soup=soup)
 
-def check_last_recharge(cust_no):
+    cust_name = get_name(soup)
+    if cust_name == 'MOST. ZESMIN ARA KHATUN':
+        cust_name = 'JESMIN ARA'
+    
+    time = get_time(soup)
+
+    return {
+        'cust_no': cust_no,
+        'cust_name': cust_name,
+        'time': time,
+        'balance': balance,
+    }
+
+
+def check_last_recharge(cust_no: Union[int, str]) -> dict:
+>>>>>>> dev
+
 	soup = BeautifulSoup(get_page(cust_no), 'lxml')
+<<<<<<< HEAD
 	x = get_last_recharge(soup)
 	token = x['token']
 	token = token.replace('\n\n\t\t\t\t\t\t\t\t\t\t\t', '')
 	token = token.replace('\n', '')
+=======
+	recharge_info = get_last_recharge(soup)
+	token = recharge_info['token']
+	token = token.replace('\n\n\t\t\t\t\t\t\t\t\t\t\t', '').replace('\n', '')
+	recharge_info['token'] = token
+>>>>>>> dev
 
 	cust_name = get_name(soup)
 	if cust_name == 'MOST. ZESMIN ARA KHATUN':
 		cust_name = 'JESMIN ARA'
+<<<<<<< HEAD
 
 	return f'''
     <b><u>Last recharge info</u></b>
@@ -102,3 +142,10 @@ def check_last_recharge(cust_no):
   Remote payment:     <b>{x['remote']}</b>
   Token: <b>{token}</b>
 	'''
+=======
+        
+	return {
+        'cust_no': cust_no,
+        'cust_name': cust_name,
+        'info': recharge_info}
+>>>>>>> dev
