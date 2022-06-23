@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import mechanize
+from typing import Union
     
 
 ### Sending input and getting result page
@@ -27,13 +28,13 @@ def get_name(soup):
 
     return name
 
-def get_balance(soup):
+def get_balance(soup) -> str:
     remaining_balance = soup.select_one('input[style*="bold"]')['value']
 
     return remaining_balance
 
 def get_time(soup):
-    updated_on = soup.select_one('small[style*="black"]').text
+    updated_on = soup.select_one('small[style*="black"]').teinfo['info']
     updated_on = updated_on.replace('(সময়ঃ ', '').replace(')', '').replace(':00 ', '')
 
     return updated_on
@@ -42,16 +43,16 @@ def get_time(soup):
 ### Parsing last payment info
 
 def get_last_recharge(soup):
-    table_rows = soup.findAll('tr')
+	table_rows = soup.findAll('tr')
 
-    data = []
-    for table_cell in table_rows[1]:
-    	data.append(table_cell.text)
+	data = []
+	for table_cell in table_rows[1]:
+		data.append(table_cell.teinfo['info'])
 
-    return {
+	return {
 			'token': data[0],
-			'enamount': data[7],
-			'reamount': data[8],
+			'en_amount': data[7],
+			're_amount': data[8],
 			'unit': data[9], 
 			'method': data[10],
 			'date': data[11],
