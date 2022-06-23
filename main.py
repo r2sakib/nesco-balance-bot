@@ -1,29 +1,149 @@
 import telebot
 import os
-import sqlite3
 from datetime import datetime
 import time
 import threading
 from dotenv import load_dotenv
-# from keep_alive import keep_alive
 
 import data_collector 
 
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import firestore
+
+
+creds = credentials.Certificate('toy-bank-bot-firebase-adminsdk.json')
+firebase_admin.initialize_app(creds)
+db = firestore.client()
+users = db.collection(u'users')
+
+
 load_dotenv()
 API_KEY = os.environ['API_KEY']
-
 bot = telebot.TeleBot(API_KEY, parse_mode='HTML')
 
-command_name = ''
-db_path = "data.db"
+command_name = None
+starting_message = "/balance - Check current balance\n/balance_default - Check current balance with preset customer no.\n/last_recharge - Check last recharge details\n/last_recharge_default - Check last recharge details with preset customer no.\n/notify - Get balance update if balance is less than ৳100\n/notify_daily - Get balance update daily at 06:00 AM"
 
-staring_message = "/balance - Check current balance\n/balance_default - Check current balance with preset customer no.\n/last_recharge - Check last recharge details\n/last_recharge_default - Check last recharge details with preset customer no.\n/notify - Get balance update if balance is less than ৳100\n/notify_daily - Get balance update daily at 06:00 AM"
 
-@bot.message_handler(commands=['start'])
+def message_formatter(type: str, cust_no) -> str:
+    """Gets data from data_collector.py and formats message for sending to TG"""
+    
+    if type == 'balance':
+        try:
+            info = data_collector.check_balance(cust_no)
+
+            message = f'''
+                <b><u>Balance info</u></b>
+    Customer no.:       <b>{info['cust_no']}</b>
+    Customer name:  <b>{info['cust_name']}</b>
+        
+    Remaining balance:   <b>৳{info['balance']}</b>
+    Updated on:   <b>{info['time']}</b>'''
+
+            return message
+        
+        except:
+            return False
+
+    elif type == 'recharge':
+        try:
+            info = data_collector.check_last_recharge(cust_no)
+
+            message = f'''
+                <b><u>Last recharge info</u></b>
+    Customer no.:       <b>{info['cust_no']}</b>
+    Customer name:  <b>{info['cust_name']}</b>
+    
+    Date:   <b>{info['info']['date']}</b>
+    Recharge amount:   <b>৳{info['info']['re_amount']}</b>
+    Energy amount:        <b>৳{info['info']['en_amount']}</b>
+    Unit (kWh):                  <b>{info['info']['unit']}</b>
+    Payment method:     <b>{info['info']['method']}</b>
+    Remote payment:     <b>{info['info']['remote']}</b>
+    Token: <b>{info['info']['token']}</b>'''
+
+            return message
+        
+        except:
+            return False
+
+    elif type == 'low_balance':
+        try:
+            info = data_collector.check_balance(cust_no)
+
+            message = f'''
+        <b><u>LOW BALANCE</u></b>
+    Customer no.:       <b>{info['cust_no']}</b>
+    Customer name:  <b>{info['cust_name']}</b>
+        
+    Remaining balance:   <b>৳{info['balance']}</b>
+    Updated on:   <b>{info['time']}</b>'''
+
+            return message
+        
+        except:
+            return False
+
+
+
+def doc_exists(doc_id: str, doc_name='users'):
+    """Checks if a document in Firestore exists or not."""
+
+    doc_ref = db.collection(doc_name).document(doc_id)
+
+    doc = doc_ref.get()
+  
+    if doc.exists:
+        return True
+    else:
+        return False
+    
+
+def get_cust_nos(doc_id: str, field: str) -> list:
+    """Gets preset customer nos from Firestore."""
+    
+    if doc_exists(doc_id):
+        doc_ref = users.document(doc_id)
+
+        try:
+            cust_nos = doc_ref.get().to_dict()[field]
+            return cust_nos
+        except:
+            return None
+
+    else:
+        return None 
+
+
+def create_doc(chat: dict):
+    """Creates a Firestore document from a TG message.chat object"""
+
+    user_data = {
+        'tg_id': str(chat.id), 
+        'username': chat.username, 
+        'name': chat.first_name + ' ' + chat.last_name, 
+        'presets': None, 
+        'notify': None, 
+        'notify_daily': None}
+    
+    tg_id = str(chat.id)
+    doc_ref = users.document(tg_id)
+
+    doc_ref.set(user_data)
+
+
+def set_cust_no(doc_id: str, field: str, cust_no: str):
+    
+    doc_ref = users.document(doc_id)
+    doc_ref.update({field: firestore.ArrayUnion([cust_no])})
+
+
+@bot.message_handler(commands=['start', 'help'])
 def start(message):
     global command_name
     command_name = 'start'
-    bot.send_message(message.chat.id, staring_message)
+    bot.send_message(message.chat.id, starting_message)
 
 
 @bot.message_handler(commands=['balance'])
@@ -59,18 +179,21 @@ def last_rechrage_default(message):
     global command_name
     command_name = 'last_recharge_default'
 
-    x = check_database(message.chat.id, 7)
+    tg_id = str(message.chat.id)
+    cust_nos = get_cust_nos(tg_id, 'presets')
 
-    if x == None:
-        bot.send_message(message.chat.id, 'Enter a customer number.  (This step is only for initialization)')
+    if cust_nos == None:
+        bot.send_message(tg_id, 'Enter a customer number.  (This step is only for initialization)')
+    
     else:
-        msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory('recharge', message=message, cust_no=x)
+        cust_no = cust_nos[0]
+        msg = bot.send_message(tg_id, 'Getting data...')
+        response = message_formatter('recharge', cust_no)
 
         if response != False:
-            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
+            bot.edit_message_text(response, tg_id, msg.message_id)
         else:
-            bot.edit_message_text('Please try again.', message.chat.id, msg.message_id)
+            bot.edit_message_text('Please try again.', tg_id, msg.message_id)
 
 
 @bot.message_handler(commands=['balance_default'])
@@ -78,177 +201,126 @@ def balance_default(message):
     global command_name
     command_name = 'balance_default'
 
-    x = check_database(message.chat.id, 8)
+    tg_id = str(message.chat.id)
+    cust_nos = get_cust_nos(tg_id, 'presets')
 
-    if x == None:
-        bot.send_message(message.chat.id, 'Enter a customer number.  (This step is only for initialization)')
+    if cust_nos == None:
+        bot.send_message(tg_id, 'Enter a customer number.  (This step is only for initialization)')
+    
     else:
-        msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory('balance', message=message, cust_no=x)
+        cust_no = cust_nos[0]
+        msg = bot.send_message(tg_id, 'Getting data...')
+        response = message_formatter('balance', cust_no)
 
         if response != False:
-            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
+            bot.edit_message_text(response, tg_id, msg.message_id)
         else:
-            bot.edit_message_text('Please try again.', message.chat.id, msg.message_id)
-
-
-def balance_rechargeHistory(type, **kwargs):
-    message = kwargs.get('message', None)
-    cust_no = kwargs.get('cust_no', None)
-
-    if cust_no == None:
-        cust_no = message.text
-
-    if type == 'recharge':
-        try:
-            return (data_collector.check_last_recharge(cust_no), None)
-        except:
-            return False
-    else:
-        try:
-            return data_collector.check_balance(cust_no)
-        except:
-            return False
-
-
-def check_database(ID, type):
-    con = sqlite3.connect(db_path)
-    db = con.cursor()
-
-    x = db.execute(f'SELECT * FROM user_data WHERE id = {ID}; ')
-
-    for row in x:
-        if row[0] == ID and row[type] == 1:
-            return row[2]
-        else:
-            return None
-
-    con.close()
-
-
-def notifier():
-
-    con = sqlite3.connect(db_path)
-    db = con.cursor()
-
-    t = ['notify', 'notify_daily']
-    for i in t:
-        x = db.execute(f'SELECT * FROM user_data WHERE {i}=1')
-    
-        cust_nos = []
-        chat_ids = []
-        for row in x:
-            cust_nos.append(row[2])
-            chat_ids.append(row[0])
-
-
-        for j in range(len(chat_ids)):
-            if len(chat_ids) > 0:
-                response = balance_rechargeHistory('balance', cust_no=cust_nos[j])
-
-                if i == 'notify' and float(response[1]) < 100: 
-                    bot.send_message(chat_ids[j], response)
-                  
-                if i == 'notify_daily' and float(response[1]) > 100:
-                    bot.send_message(chat_ids[j], response)
-
-
+            bot.edit_message_text('Please try again.', tg_id, msg.message_id)
 
 
 @bot.message_handler()
 def echo(message):
     if command_name == 'start':
-      bot.send_message(message.chat.id, )
+      bot.send_message(message.chat.id, starting_message)
     
     if command_name == 'balance' or command_name == 'recharge':
 
         msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory(command_name, message=message)
+        response = message_formatter(command_name, message.text)
 
         if response != False:
-            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
-            # bot.send_message(message.chat.id, response)
+            bot.edit_message_text(response, message.chat.id, msg.message_id)
         else:
             bot.edit_message_text('Enter a valid customer number, or try again.', message.chat.id, msg.message_id)
 
 
     if command_name == 'notify':
 
-        m = message.chat
+        tg_id = str(message.chat.id)
 
-        con = sqlite3.connect(db_path)
-        db = con.cursor()
+        if not doc_exists(tg_id):
+            create_doc(message.chat)
 
-        try:
-            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
-        except sqlite3.IntegrityError:
-            db.execute(f'UPDATE user_data SET notify=1 WHERE id={m.id}')
+        if doc_exists(tg_id):
+            set_cust_no(tg_id, 'notify', message.text)
 
-        con.commit()
-        con.close()
         bot.send_message(message.chat.id, 'Setup success! You will get a message if remaining balance balance is less than ৳100.')
     
 
     if command_name == 'notify_daily':
 
-        m = message.chat
+        tg_id = str(message.chat.id)
 
-        con = sqlite3.connect(db_path)
-        db = con.cursor()
+        if not doc_exists(tg_id):
+            create_doc(message.chat)
 
-        try:
-            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
-        except sqlite3.IntegrityError:
-            db.execute(f'UPDATE user_data SET notify_daily=1 WHERE id={m.id}')
-            db.execute(f'UPDATE user_data SET customer_id={message.text} WHERE id={m.id}')
+        if doc_exists(tg_id):
+            set_cust_no(tg_id, 'notify_daily', message.text)
 
-        con.commit()
-        con.close()
         bot.send_message(message.chat.id, 'Setup success! You will get a balance update eveyday at 06:00 AM.')
 
 
     if command_name == 'last_recharge_default':
 
-        m = message.chat
+        tg_id = str(message.chat.id)
 
-        con = sqlite3.connect(db_path)
-        db = con.cursor()
+        if not doc_exists(tg_id):
+            create_doc(message.chat)
 
-        try:
-            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
-        except sqlite3.IntegrityError:
-            db.execute(f'UPDATE user_data SET default_recharge=1 WHERE id={m.id}')
-            db.execute(f'UPDATE user_data SET customer_id={message.text} WHERE id={m.id}')
-        con.commit()
-        con.close()
-        bot.send_message(message.chat.id, "Setup success! Just send the command next time to see last recharge history without entering customer no.")
+        if doc_exists(tg_id):
+            set_cust_no(tg_id, 'presets', message.text)
+
+        bot.send_message(message.chat.id, "Setup success! Just send the command /last_recharge_default next time to see last recharge history without entering customer no.")
 
 
     if command_name == 'balance_default':
 
-        m = message.chat
+        tg_id = str(message.chat.id)
 
-        con = sqlite3.connect(db_path)
-        db = con.cursor()
+        if not doc_exists(tg_id):
+            create_doc(message.chat)
 
-        try:
-            db.execute(f"INSERT INTO user_data (id, username, customer_id, first_name, last_name, notify) VALUES ({m.id}, '{m.username}', '{message.text}', '{m.first_name}', '{m.last_name}', 1)")
-        except sqlite3.IntegrityError:
-            db.execute(f'UPDATE user_data SET default_balance=1 WHERE id={m.id}')
-            db.execute(f'UPDATE user_data SET customer_id={message.text} WHERE id={m.id}')
+        if doc_exists(tg_id):
+            set_cust_no(tg_id, 'presets', message.text)
 
-        con.commit()
-        con.close()
         bot.send_message(message.chat.id, 'Just send the command /balance_default next time to see balance without entering customer no.')
+
+
+def notifier():
+
+    sent_notify_to: list[str] = []
+
+    docs_notify = users.where('notify', u'!=', 'null').stream()
+    for doc in docs_notify:
+        cust_no = doc.to_dict()['notify'][0]
+        tg_id = doc.to_dict()['tg_id']
+
+        balance = data_collector.get_balance(cust_no=cust_no)
+
+        if float(balance) < 100: 
+            response = message_formatter('low_balance', cust_no)
+            bot.send_message(tg_id, response)
+        
+        sent_notify_to.append((cust_no, tg_id))
+
+
+    docs_notify_daily = users.where('notify_daily', '!=', 'null').stream()
+    for doc in docs_notify_daily:
+        cust_no = doc.to_dict()['notify_daily'][0]
+        tg_id = doc.to_dict()['tg_id']
+
+        if (cust_no, tg_id) not in sent_notify_to:
+            response = message_formatter('balance', cust_no)
+            bot.send_message(tg_id, response)
+
 
 def notifier_time(): 
     while True:
-        if datetime.now().hour == 00 and datetime.now().minute > 00:
+        if datetime.utcnow().hour == 00 and datetime.now().minute > 00:
             notifier()
             time.sleep(3600)
         else:
             time.sleep(1800)
-
 
 
 botthread = threading.Thread(target=bot.polling)
