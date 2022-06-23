@@ -5,7 +5,6 @@ from datetime import datetime
 import time
 import threading
 from dotenv import load_dotenv
-# from keep_alive import keep_alive
 
 import data_collector 
 
@@ -59,13 +58,13 @@ def last_rechrage_default(message):
     global command_name
     command_name = 'last_recharge_default'
 
-    x = check_database(message.chat.id, 7)
+    cust_no = check_database(message.chat.id, 7)
 
-    if x == None:
+    if cust_no == None:
         bot.send_message(message.chat.id, 'Enter a customer number.  (This step is only for initialization)')
     else:
         msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory('recharge', message=message, cust_no=x)
+        response = message_formatter('recharge', cust_no)
 
         if response != False:
             bot.edit_message_text(response[0], message.chat.id, msg.message_id)
@@ -78,37 +77,78 @@ def balance_default(message):
     global command_name
     command_name = 'balance_default'
 
-    x = check_database(message.chat.id, 8)
+    cust_no = check_database(message.chat.id, 8)
 
-    if x == None:
+    if cust_no == None:
         bot.send_message(message.chat.id, 'Enter a customer number.  (This step is only for initialization)')
     else:
         msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory('balance', message=message, cust_no=x)
+        response = message_formatter('balance', cust_no)
 
         if response != False:
-            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
+            bot.edit_message_text(response, message.chat.id, msg.message_id)
         else:
             bot.edit_message_text('Please try again.', message.chat.id, msg.message_id)
 
 
-def balance_rechargeHistory(type, **kwargs):
-    message = kwargs.get('message', None)
-    cust_no = kwargs.get('cust_no', None)
-
-    if cust_no == None:
-        cust_no = message.text
-
-    if type == 'recharge':
+def message_formatter(type: str, cust_no) -> str:
+    
+    if type == 'balance':
         try:
-            return (data_collector.check_last_recharge(cust_no), None)
+            info = data_collector.check_balance(cust_no)
+
+            message = f'''
+                <b><u>Balance info</u></b>
+    Customer no.:       <b>{info['cust_no']}</b>
+    Customer name:  <b>{info['cust_name']}</b>
+        
+    Remaining balance:   <b>৳{info['balance']}</b>
+    Updated on:   <b>{info['time']}</b>'''
+
+            return message
+        
         except:
             return False
-    else:
+
+    elif type == 'recharge':
         try:
-            return data_collector.check_balance(cust_no)
+            info = data_collector.check_last_recharge(cust_no)
+
+            message = f'''
+                <b><u>Last recharge info</u></b>
+    Customer no.:       <b>{info['cust_no']}</b>
+    Customer name:  <b>{info['cust_name']}</b>
+    
+    Date:   <b>{info['info']['date']}</b>
+    Recharge amount:   <b>৳{info['info']['re_amount']}</b>
+    Energy amount:        <b>৳{info['info']['en_amount']}</b>
+    Unit (kWh):                 <b>{info['info']['unit']}</b>
+    Payment method:     <b>{info['info']['method']}</b>
+    Remote payment:     <b>{info['info']['remote']}</b>
+    Token: <b>{info['info']['token']}</b>'''
+
+            return message
+        
         except:
             return False
+
+    elif type == 'low_balance':
+        try:
+            info = data_collector.check_balance(cust_no)
+
+            message = f'''
+                <b><u>LOW BALANCE</u></b>
+            Customer no.:       <b>{info['cust_no']}</b>
+            Customer name:  <b>{info['cust_name']}</b>
+                
+            Remaining balance:   <b>৳{info['balance']}</b>
+            Updated on:   <b>{info['time']}</b>'''
+
+            return message
+        
+        except:
+            return False
+
 
 
 def check_database(ID, type):
@@ -144,12 +184,15 @@ def notifier():
 
         for j in range(len(chat_ids)):
             if len(chat_ids) > 0:
-                response = balance_rechargeHistory('balance', cust_no=cust_nos[j])
 
-                if i == 'notify' and float(response[1]) < 100: 
+                balance = data_collector.get_balance(cust_no=cust_nos[j])
+
+                if i == 'notify' and float(balance) < 100: 
+                    response = message_formatter('low_balance', cust_nos[j])
                     bot.send_message(chat_ids[j], response)
                   
-                if i == 'notify_daily' and float(response[1]) > 100:
+                if i == 'notify_daily' and float(balance) > 100:
+                    response = message_formatter('balance', cust_nos[j])
                     bot.send_message(chat_ids[j], response)
 
 
@@ -163,11 +206,10 @@ def echo(message):
     if command_name == 'balance' or command_name == 'recharge':
 
         msg = bot.send_message(message.chat.id, 'Getting data...')
-        response = balance_rechargeHistory(command_name, message=message)
+        response = message_formatter(command_name, message.text)
 
         if response != False:
-            bot.edit_message_text(response[0], message.chat.id, msg.message_id)
-            # bot.send_message(message.chat.id, response)
+            bot.edit_message_text(response, message.chat.id, msg.message_id)
         else:
             bot.edit_message_text('Enter a valid customer number, or try again.', message.chat.id, msg.message_id)
 

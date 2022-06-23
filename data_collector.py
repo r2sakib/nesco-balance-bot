@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import mechanize
+from typing import Union
     
 
 ### Sending input and getting result page
@@ -27,10 +28,13 @@ def get_name(soup):
 
     return name
 
-def get_balance(soup):
-    remaining_balance = soup.select_one('input[style*="bold"]')['value']
+def get_balance(soup=None, cust_no=None) -> str:
+    if soup == None:
+        soup = BeautifulSoup(get_page(cust_no), 'lxml')
 
+    remaining_balance = soup.select_one('input[style*="bold"]')['value']
     return remaining_balance
+
 
 def get_time(soup):
     updated_on = soup.select_one('small[style*="black"]').text
@@ -42,16 +46,16 @@ def get_time(soup):
 ### Parsing last payment info
 
 def get_last_recharge(soup):
-    table_rows = soup.findAll('tr')
+	table_rows = soup.findAll('tr')
 
-    data = []
-    for table_cell in table_rows[1]:
-    	data.append(table_cell.text)
+	data = []
+	for table_cell in table_rows[1]:
+		data.append(table_cell.text)
 
-    return {
+	return {
 			'token': data[0],
-			'enamount': data[7],
-			'reamount': data[8],
+			'en_amount': data[7],
+			're_amount': data[8],
 			'unit': data[9], 
 			'method': data[10],
 			'date': data[11],
@@ -60,26 +64,38 @@ def get_last_recharge(soup):
 
 
 ### Genereting outputs
-def check_balance(cust_no):
+def check_balance(cust_no: Union[int, str]) -> dict:
+
     soup = BeautifulSoup(get_page(cust_no), 'lxml')
-    b = get_balance(soup)
-    return f'''
-	Customer no.:       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
+    balance = get_balance(soup=soup)
 
-	Remaining balance:   <b>৳{b}</b>
-	Updated on:   <b>{get_time(soup)}</b>
-	''', b
+    cust_name = get_name(soup)
+    if cust_name == 'MOST. ZESMIN ARA KHATUN':
+        cust_name = 'JESMIN ARA'
+    
+    time = get_time(soup)
 
-def check_last_recharge(cust_no):
+    return {
+        'cust_no': cust_no,
+        'cust_name': cust_name,
+        'time': time,
+        'balance': balance,
+    }
+
+
+def check_last_recharge(cust_no: Union[int, str]) -> dict:
+
 	soup = BeautifulSoup(get_page(cust_no), 'lxml')
-	x = get_last_recharge(soup)
-	return f'''
-	Customer no.:       <b>{cust_no}</b>\nCustomer name:   <b>{get_name(soup)}</b>\n
+	recharge_info = get_last_recharge(soup)
+	token = recharge_info['token']
+	token = token.replace('\n\n\t\t\t\t\t\t\t\t\t\t\t', '').replace('\n', '')
+	recharge_info['token'] = token
 
-	Date:   <b>{x['date']}</b>
-	Recharge amount:    <b>৳{x['reamount']}</b>
-	Energy amount:         <b>৳{x['enamount']}</b>
-	Unit (kWh):                   <b>{x['unit']}</b>
-	Payment method:     <b>{x['method']}</b>
-	Remote payment:     <b>{x['remote']}</b>\n Token:  *{x['token']}</b>
-	'''
+	cust_name = get_name(soup)
+	if cust_name == 'MOST. ZESMIN ARA KHATUN':
+		cust_name = 'JESMIN ARA'
+        
+	return {
+        'cust_no': cust_no,
+        'cust_name': cust_name,
+        'info': recharge_info}
