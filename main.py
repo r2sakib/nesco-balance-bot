@@ -1,5 +1,3 @@
-from inspect import trace
-from sched import scheduler
 import telebot
 import os
 from threading import Thread
@@ -7,8 +5,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 from time import sleep
 import traceback
-
-import urllib3
 
 import data_collector 
 
