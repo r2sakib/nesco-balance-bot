@@ -1,9 +1,9 @@
 import telebot
 import os
-from datetime import datetime
-import time
-import threading
+from threading import Thread
 from dotenv import load_dotenv
+from datetime import datetime
+from time import sleep
 
 import data_collector 
 
@@ -314,17 +314,17 @@ def notifier():
             bot.send_message(tg_id, response)
 
 
-def notifier_time(): 
+def notifier_time():
     while True:
-        if datetime.utcnow().hour == 00 and datetime.now().minute > 00:
+        if datetime.now().hour == 00 and datetime.now().minute > 00:
             notifier()
-            time.sleep(3600)
+            sleep(3600)
         else:
-            time.sleep(1800)
+            sleep(1800)
 
 
-botthread = threading.Thread(target=bot.polling)
-botthread.start()
-    
-notifierthread = threading.Thread(target=notifier_time)
-notifierthread.start()
+bot_thread = Thread(target=bot.polling)
+bot_thread.start()
+
+notifier_thread = Thread(target=notifier_time)
+notifier_thread.start()
