@@ -350,8 +350,8 @@ def notifier():
             if float(balance) < 100: 
                 response = message_formatter('low_balance', cust_no)
                 bot.send_message(tg_id, response)
-            
-            sent_notify_to.append((cust_no, tg_id))
+
+                sent_notify_to.append((cust_no, tg_id))
 
 
         docs_notify_daily = users.where('notify_daily', '!=', 'null').stream()
@@ -369,7 +369,7 @@ def notifier():
 
 def notifier_time():
     while True:
-        if datetime.now().hour == 17 and datetime.now().minute > 00:
+        if datetime.now().hour == 00 and datetime.now().minute > 00:
             notifier()
             sleep(3600)
         else:
