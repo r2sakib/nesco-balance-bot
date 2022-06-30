@@ -3,7 +3,6 @@
 import os
 from threading import Thread
 from dotenv import load_dotenv
-from datetime import datetime
 from time import sleep
 import traceback
 
@@ -97,7 +96,7 @@ def notify(message):
 
                 inline_markup.add(btn_add, btn_remove)
 
-                msg = bot.send_message(tg_id, ('• Tap on <b>Add</b> if you want to add <i>low balance update</i> for another customer no.\n'
+                msg = bot.send_message(tg_id, ('• Tap on <b>Add</b> if you want to add <i>low balance update</i> for another customer no.\n\n'
                                         '• Tap on <b>Remove</b> to remove a customer number from <i>low balance update</i>.'), reply_markup=inline_markup)
 
                 global message_id, chat_id
@@ -131,7 +130,7 @@ def notify_daily(message):
 
                 inline_markup.add(btn_add, btn_remove)
 
-                msg = bot.send_message(tg_id, ('• Tap on <b>Add</b> if you want to add <i>daily balance update</i> for another customer no.\n'
+                msg = bot.send_message(tg_id, ('• Tap on <b>Add</b> if you want to add <i>daily balance update</i> for another customer no.\n\n'
                                         '• Tap on <b>Remove</b> to remove a customer number from <i>daily balance update</i>.'), reply_markup=inline_markup)
 
                 global message_id, chat_id
