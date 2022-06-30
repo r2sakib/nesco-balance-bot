@@ -22,7 +22,7 @@ bot = TeleBot(TG_BOT_TOKEN, parse_mode='HTML')
 command_name = None
 STARTING_MESSAGE = ("/balance - Check current balance\n"
                     "/recharge_details - Check last recharge details.\n"
-                    "/add_remove_presets - Add customer numbers for easy access\n"
+                    "/presets - Add customer numbers for easy access\n"
                     "/notify - Get balance update if balance is less than ৳100\n"
                     "/notify_daily - Get balance update daily at 06:00 AM\n"
                     )
@@ -145,11 +145,11 @@ def notify_daily(message):
 
 
 
-@bot.message_handler(commands=['add_remove_presets'])
-def add_remove_presets(message):
+@bot.message_handler(commands=['presets'])
+def presets(message):
     try:
         global command_name
-        command_name = 'add_remove_presets'
+        command_name = 'presets'
 
         tg_id: int = message.chat.id
 
@@ -166,7 +166,7 @@ def add_remove_presets(message):
 
                 inline_markup.add(btn_add, btn_remove)
 
-                msg = bot.send_message(tg_id, ('• Tap on <b>Add</b> if you want to add a customer no. to <i>presets</i>.\n\n'
+                msg = bot.send_message(tg_id, ('• Tap on <b>Add</b> if you want to add a customer number to <i>presets</i>.\n\n'
                                         '• Tap on <b>Remove</b> to remove a customer number from <i>presets</i>.'), reply_markup=inline_markup)
 
                 global message_id, chat_id
@@ -214,10 +214,10 @@ def process_callbacks(query):
 
         return
 
-    if command_name == 'add_remove_presets' and query.data == 'Add':
+    if command_name == 'presets' and query.data == 'Add':
         bot.edit_message_text('Enter a customer no. to add to <i>presets</i>.', chat_id, message_id)
 
-    elif command_name == 'add_remove_presets' and query.data == 'Remove':
+    elif command_name == 'presets' and query.data == 'Remove':
         bot.edit_message_text('Select one from below <b>to remove</b> from <i>presets</i>.',
                                 chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='presets'))
     
@@ -240,7 +240,7 @@ def process_callbacks(query):
         except:
             global query_data_2; query_data_2 = query.data
 
-    elif command_name == 'add_remove_presets':
+    elif command_name == 'presets':
         try:
             cust_no = int(query.data)
             remove_cust_no(chat_id, 'presets', query.data)
@@ -301,7 +301,7 @@ def handle_all_messages(message):
                                     reply_markup=remove_keyboard)
 
 
-            if command_name == 'add_remove_presets':
+            if command_name == 'presets':
 
                 if query_data_3 == 'Add':
                     
@@ -310,7 +310,7 @@ def handle_all_messages(message):
 
                     set_cust_no(tg_id, 'presets', message.text)
 
-                    bot.send_message(tg_id, f"Customer number: <b>{message.text}</b> added to presers.!\n\nJust send the command /balance or /recharge_details next time to see balance or last recharge details without entering customer no.\n\nYou can add more presets too.")
+                    bot.send_message(tg_id, f"Customer number: <b>{message.text}</b> added to presers.!\n\nJust send the command /balance\nor /recharge_details next time to see balance or last recharge details without entering customer no.\n\nYou can add more presets too.")
 
         else:
             bot.send_message(message.chat.id, 'Input not valid. Enter again.')
