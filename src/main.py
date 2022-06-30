@@ -144,52 +144,6 @@ def notify_daily(message):
         logger(traceback.format_exc())
 
 
-query_data = 'Add'
-query_data_2 = 'Add'
-
-@bot.callback_query_handler(func=lambda call: True)
-def process_callbacks(query):
-
-    if query.data == 'Add' and command_name == 'notify':
-        bot.delete_message(chat_id, message_id)
-        bot.send_message(chat_id, SELECTION_MESSAGE,
-                            reply_markup=generate_reply_markup(chat_id, 'reply_keyboard', field='presets'))
-
-    if query.data == 'Remove' and command_name == 'notify':
-        bot.edit_message_text('Select one from below <b>to remove</b> from <i>low balance notification</i>.',
-                                chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='notify'))
-
-        return
-
-    if query.data == 'Add' and command_name == 'notify_daily':
-        bot.delete_message(chat_id, message_id)
-        bot.send_message(chat_id, SELECTION_MESSAGE, 
-                        reply_markup=generate_reply_markup(chat_id, 'reply_keyboard', field='presets'))
-
-    if query.data == 'Remove' and command_name == 'notify_daily':
-        bot.edit_message_text('Select one from below <b>to remove</b> from <i>low balance notification</i>.',
-                                chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='notify_daily'))
-
-        return
-
-    if command_name == 'notify':
-        try:
-            cust_no = int(query.data)
-            remove_cust_no(chat_id, 'notify', query.data)
-            bot.edit_message_text(f'Customer no.: <b>{cust_no}</b> removed from <i>low balance notification</i>.', chat_id, message_id)
-
-        except:
-            global query_data; query_data = query.data
-
-    elif command_name == 'notify_daily':
-        try:
-            cust_no = int(query.data)
-            remove_cust_no(chat_id, 'notify_daily', query.data)
-            bot.edit_message_text(f'Customer no.: <b>{cust_no}</b> removed from <i>daily balance notification</i>.', chat_id, message_id)
-
-        except:
-            global query_data_2; query_data_2 = query.data
-
 
 @bot.message_handler(commands=['add_remove_presets'])
 def add_remove_presets(message):
@@ -198,14 +152,29 @@ def add_remove_presets(message):
         command_name = 'add_remove_presets'
 
         tg_id: int = message.chat.id
-        cust_nos = get_cust_nos(tg_id, 'presets')
 
-        if doc_exists(tg_id) and len(cust_nos) > 0:
-            bot.send_message(tg_id, '• Enter a customer number <b>to add</b> to presets.\n\n• Or select one from below <b>to remove</b>.', 
-                        reply_markup=generate_reply_markup(tg_id, 'reply_keyboard', cust_nos=cust_nos))
+        if doc_exists(tg_id):
+            cust_nos: list = get_cust_nos(tg_id, 'presets')
+
+            if len(cust_nos) == 0:
+                bot.send_message(tg_id, 'Enter a customer no. to add to <i>presets</i>.', reply_markup=generate_reply_markup(tg_id, 'reply_keyboard', cust_nos=cust_nos))
+
+            elif len(cust_nos) > 0:
+                inline_markup = types.InlineKeyboardMarkup(row_width=2)
+                btn_add= types.InlineKeyboardButton('Add', callback_data='Add')
+                btn_remove = types.InlineKeyboardButton('Remove', callback_data='Remove')
+
+                inline_markup.add(btn_add, btn_remove)
+
+                msg = bot.send_message(tg_id, ('• Tap on <b>Add</b> if you want to add a customer no. to <i>presets</i>.\n\n'
+                                        '• Tap on <b>Remove</b> to remove a customer number from <i>presets</i>.'), reply_markup=inline_markup)
+
+                global message_id, chat_id
+                message_id = msg.id
+                chat_id = tg_id
         
         else:
-            bot.send_message(tg_id, '• Enter a customer number <b>to add</b> to presets.')
+            bot.send_message(tg_id, 'Enter a customer no. to add to <i>presets</i>.')
 
 
     except Exception:
@@ -214,6 +183,72 @@ def add_remove_presets(message):
             bot.send_message(tg_id, 'Error occured. Try again after some time.')
         except Exception:
             logger(traceback.format_exc())
+
+
+query_data = 'Add'
+query_data_2 = 'Add'
+query_data_3 = 'Add'
+
+@bot.callback_query_handler(func=lambda call: True)
+def process_callbacks(query):
+
+    if command_name == 'notify' and query.data == 'Add':
+        bot.delete_message(chat_id, message_id)
+        bot.send_message(chat_id, SELECTION_MESSAGE,
+                            reply_markup=generate_reply_markup(chat_id, 'reply_keyboard', field='presets'))
+
+    elif command_name == 'notify' and query.data == 'Remove':
+        bot.edit_message_text('Select one from below <b>to remove</b> from <i>low balance update</i>.',
+                                chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='notify'))
+
+        return
+
+    if command_name == 'notify_daily' and query.data == 'Add':
+        bot.delete_message(chat_id, message_id)
+        bot.send_message(chat_id, SELECTION_MESSAGE, 
+                        reply_markup=generate_reply_markup(chat_id, 'reply_keyboard', field='presets'))
+
+    elif command_name == 'notify_daily' and query.data == 'Remove':
+        bot.edit_message_text('Select one from below <b>to remove</b> from <i>daily balance update</i>.',
+                                chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='notify_daily'))
+
+        return
+
+    if command_name == 'add_remove_presets' and query.data == 'Add':
+        bot.edit_message_text('Enter a customer no. to add to <i>presets</i>.', chat_id, message_id)
+
+    elif command_name == 'add_remove_presets' and query.data == 'Remove':
+        bot.edit_message_text('Select one from below <b>to remove</b> from <i>presets</i>.',
+                                chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='presets'))
+    
+
+    if command_name == 'notify':
+        try:
+            cust_no = int(query.data)
+            remove_cust_no(chat_id, 'notify', query.data)
+            bot.edit_message_text(f'Customer no.: <b>{cust_no}</b> removed from <i>low balance update</i>.', chat_id, message_id)
+
+        except:
+            global query_data; query_data = query.data
+
+    elif command_name == 'notify_daily':
+        try:
+            cust_no = int(query.data)
+            remove_cust_no(chat_id, 'notify_daily', query.data)
+            bot.edit_message_text(f'Customer no.: <b>{cust_no}</b> removed from <i>daily balance update</i>.', chat_id, message_id)
+
+        except:
+            global query_data_2; query_data_2 = query.data
+
+    elif command_name == 'add_remove_presets':
+        try:
+            cust_no = int(query.data)
+            remove_cust_no(chat_id, 'presets', query.data)
+            bot.edit_message_text(f'Customer no.: <b>{cust_no}</b> removed from <i>presets.</i>.', chat_id, message_id)
+
+        except:
+            global query_data_3; query_data_3 = query.data
+
 
 
 @bot.message_handler()
@@ -262,25 +297,20 @@ def handle_all_messages(message):
 
                     set_cust_no(tg_id, 'notify_daily', message.text)
 
-                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a balance update eveyday at 06:00 AM. for customer no.: <b>{message.text}</b>',
+                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a balance update eveyday at 06:00 AM for customer no.: <b>{message.text}</b>',
                                     reply_markup=remove_keyboard)
 
 
             if command_name == 'add_remove_presets':
 
-                if not doc_exists(tg_id):
-                    create_doc(message.chat)
+                if query_data_3 == 'Add':
+                    
+                    if not doc_exists(tg_id):
+                        create_doc(message.chat)
 
-                cust_nos = get_cust_nos(tg_id, 'presets')
-                
-                if message.text in cust_nos:
-                    remove_cust_no(tg_id, 'presets', message.text)
-                    bot.send_message(tg_id, f'Customer number: <b>{message.text}</b> removed from presets.', reply_markup=remove_keyboard)
-
-                else:
                     set_cust_no(tg_id, 'presets', message.text)
-                    bot.send_message(tg_id, f"Customer number: <b>{message.text}</b> added!\n\nJust send the command /balance or /recharge_details next time to see balance or last recharge details without entering customer no.\n\nYou can add more presets too.",
-                                    reply_markup=remove_keyboard)
+
+                    bot.send_message(tg_id, f"Customer number: <b>{message.text}</b> added to presers.!\n\nJust send the command /balance or /recharge_details next time to see balance or last recharge details without entering customer no.\n\nYou can add more presets too.")
 
         else:
             bot.send_message(message.chat.id, 'Input not valid. Enter again.')
