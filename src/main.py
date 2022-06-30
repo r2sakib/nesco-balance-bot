@@ -11,6 +11,7 @@ from telebot import TeleBot
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
+import schedule
 
 import data_collector 
 
@@ -33,7 +34,6 @@ starting_message = ("/balance - Check current balance\n"
                     "/notify_daily - Get balance update daily at 06:00 AM\n"
                     )
 
-print(type(starting_message), starting_message, sep='\n')
 
 def logger(log):
     with open('logs.md', 'a') as log_file:
@@ -267,7 +267,7 @@ def balance_default(message):
 
 
 @bot.message_handler()
-def echo(message):
+def handle_all_messages(message):
     try:
         if command_name == 'start':
             bot.send_message(message.chat.id, starting_message)
@@ -375,13 +375,11 @@ def notifier():
 
 
 def notifier_time():
-    while True:
-        if datetime.now().hour == 00 and datetime.now().minute > 00:
-            notifier()
-            sleep(3600)
-        else:
-            sleep(1800)
+    schedule.every().day.at("00:00").do(notifier)
 
+    while True:
+        schedule.run_pending()
+        sleep(60)
 try:
     bot_thread = Thread(target=bot.polling)
     bot_thread.start()
