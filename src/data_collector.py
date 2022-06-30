@@ -1,6 +1,7 @@
+# Python version = 3.10.4
+
 from bs4 import BeautifulSoup
 import mechanize
-from typing import Union
     
 
 ### Sending input and getting result page
@@ -64,7 +65,7 @@ def get_last_recharge(soup):
 
 
 ### Genereting outputs
-def check_balance(cust_no: Union[int, str]) -> dict:
+def check_balance(cust_no: int | str) -> dict:
 
     soup = BeautifulSoup(get_page(cust_no), 'lxml')
     balance = get_balance(soup=soup)
@@ -83,7 +84,7 @@ def check_balance(cust_no: Union[int, str]) -> dict:
     }
 
 
-def check_last_recharge(cust_no: Union[int, str]) -> dict:
+def check_last_recharge(cust_no: int | str) -> dict:
 
 	soup = BeautifulSoup(get_page(cust_no), 'lxml')
 	recharge_info = get_last_recharge(soup)
