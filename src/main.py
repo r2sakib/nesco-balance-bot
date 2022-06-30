@@ -7,13 +7,14 @@ from datetime import datetime
 from time import sleep
 import traceback
 
-from telebot import TeleBot
+from telebot import TeleBot, types
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 import schedule
 
 import data_collector 
+
 
 creds = credentials.Certificate('src/firebase-admin-sdk.json')
 firebase_admin.initialize_app(creds)
@@ -26,13 +27,14 @@ TG_BOT_TOKEN = os.environ['TG_BOT_TOKEN']
 bot = TeleBot(TG_BOT_TOKEN, parse_mode='HTML')
 
 command_name = None
-starting_message = ("/balance - Check current balance\n"
-                    "/balance_default - Check current balance with preset customer no.\n"
-                    "/last_recharge - Check last recharge details\n"
-                    "/last_recharge_default - Check last recharge details with preset customer no.\n"
+STARTING_MESSAGE = ("/balance - Check current balance\n"
+                    "/recharge_details - Check last recharge details.\n"
+                    "/add_remove_presets - Add customer numbers for easy access\n"
                     "/notify - Get balance update if balance is less than ৳100\n"
                     "/notify_daily - Get balance update daily at 06:00 AM\n"
                     )
+
+SELECTION_MESSAGE = '- Enter a customer number.\n- Or select one from below. (Will be shown below if you have added persets.)'
 
 
 def logger(log):
@@ -61,7 +63,7 @@ def message_formatter(type: str, cust_no) -> str:
         except:
             return False
 
-    elif type == 'recharge':
+    elif type == 'recharge_details':
         try:
             info = data_collector.check_last_recharge(cust_no)
 
@@ -101,8 +103,10 @@ def message_formatter(type: str, cust_no) -> str:
             return False
 
 
-def doc_exists(doc_id: str, doc_name='users'):
+def doc_exists(doc_id: str | int, doc_name='users'):
     """Checks if a document in Firestore exists or not."""
+
+    doc_id = str(doc_id)
 
     doc_ref = db.collection(doc_name).document(doc_id)
 
@@ -114,9 +118,44 @@ def doc_exists(doc_id: str, doc_name='users'):
         return False
     
 
-def get_cust_nos(doc_id: str, field: str) -> list:
-    """Gets preset customer nos from Firestore."""
+def create_doc(chat: dict):
+    """Creates a Firestore document from a TG message.chat object"""
+
+    user_data = {
+        'tg_id': str(chat.id), 
+        'username': chat.username, 
+        'name': chat.first_name + ' ' + chat.last_name, 
+        'presets': [], 
+        'notify': [], 
+        'notify_daily': []}
     
+    tg_id = str(chat.id)
+    doc_ref = users.document(tg_id)
+
+    doc_ref.set(user_data)
+
+
+def set_cust_no(doc_id: str, field: str, cust_no: str | int):
+
+    doc_id = str(doc_id)
+    
+    doc_ref = users.document(doc_id)
+    doc_ref.update({field: firestore.ArrayUnion([cust_no])})
+
+
+def remove_cust_no(doc_id: str, field: str, cust_no: str):
+
+    doc_id = str(doc_id)
+
+    doc_ref = users.document(doc_id)
+    doc_ref.update({field: firestore.ArrayRemove([cust_no])})
+
+
+def get_cust_nos(doc_id: str | int, field: str) -> list:
+    """Gets preset customer nos from Firestore. provided a doc_id (TG chat id)"""
+    
+    doc_id = str(doc_id)
+
     if doc_exists(doc_id):
         doc_ref = users.document(doc_id)
 
@@ -130,27 +169,41 @@ def get_cust_nos(doc_id: str, field: str) -> list:
         return None 
 
 
-def create_doc(chat: dict):
-    """Creates a Firestore document from a TG message.chat object"""
+def generate_reply_markup(tg_id: str | int, type: str, cust_nos: list = None, field: str = 'presets'):
+    """Generates Telebot ReplyKeyboardMarkup (reply_keyboard) | InlineKeyboardMarkup (inline_keyboard)
+    of customer numbers from Firestore using tg_id (doc_id)
+    """
 
-    user_data = {
-        'tg_id': str(chat.id), 
-        'username': chat.username, 
-        'name': chat.first_name + ' ' + chat.last_name, 
-        'presets': None, 
-        'notify': None, 
-        'notify_daily': None}
+    cust_nos = get_cust_nos(tg_id, field)
+
+    if type == 'reply_keyboard':
+        reply_markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True, resize_keyboard=True)
+
+        buttons = []
+        for cust_no in cust_nos:
+            buttons.append(types.KeyboardButton(cust_no))
+
+        reply_markup.add(*buttons)
     
-    tg_id = str(chat.id)
-    doc_ref = users.document(tg_id)
 
-    doc_ref.set(user_data)
+    elif type == 'inline_keyboard':
+        reply_markup = types.InlineKeyboardMarkup(row_width=2)
+
+        buttons = []
+        for cust_no in cust_nos:
+            buttons.append(types.InlineKeyboardButton(cust_no, callback_data=cust_no))
+
+        reply_markup.add(*buttons)
+
+    return reply_markup
 
 
-def set_cust_no(doc_id: str, field: str, cust_no: str):
-    
-    doc_ref = users.document(doc_id)
-    doc_ref.update({field: firestore.ArrayUnion([cust_no])})
+def check_input_validity(text: str):
+    try:
+        text = int(text)
+        return True
+    except:
+        False
 
 
 @bot.message_handler(commands=['start', 'help'])
@@ -158,110 +211,182 @@ def start_help(message):
     try:
         global command_name
         command_name = 'start'
-        bot.send_message(message.chat.id, starting_message, parse_mode=None)
+        bot.send_message(message.chat.id, STARTING_MESSAGE, parse_mode=None)
 
     except Exception:
         logger(traceback.format_exc())
+
 
 @bot.message_handler(commands=['balance'])
 def balance(message):
     try:
         global command_name
         command_name = 'balance'
-        bot.send_message(message.chat.id, 'Enter a customer number.')
+
+        tg_id = message.chat.id
+        if doc_exists(tg_id):
+            bot.send_message(tg_id, SELECTION_MESSAGE, reply_markup=generate_reply_markup(tg_id, 'reply_keyboard'))
+        
+        else:
+            bot.send_message(tg_id, SELECTION_MESSAGE)
 
     except Exception:
         logger(traceback.format_exc())
 
 
-@bot.message_handler(commands=['last_recharge'])
-def recharge(message):
+@bot.message_handler(commands=['recharge_details'])
+def recharge_details(message):
     try:
         global command_name
-        command_name = 'recharge'
-        bot.send_message(message.chat.id, 'Enter a customer number.')
+        command_name = 'recharge_details'
+
+        tg_id = message.chat.id
+        if doc_exists(tg_id):
+            bot.send_message(tg_id, SELECTION_MESSAGE, reply_markup=generate_reply_markup(tg_id, 'reply_keyboard'))
+        
+        else:
+            bot.send_message(tg_id, SELECTION_MESSAGE)
 
     except Exception:
         logger(traceback.format_exc())
+
 
 @bot.message_handler(commands=['notify'])
 def notify(message):
     try:
         global command_name
         command_name = 'notify'
-        bot.send_message(message.chat.id, 'Enter a customer number.')
+
+        tg_id: int = message.chat.id
+
+        if doc_exists(tg_id):
+            cust_nos: list = get_cust_nos(tg_id, 'notify')
+
+            if len(cust_nos) == 0:
+                bot.send_message(tg_id, SELECTION_MESSAGE, reply_markup=generate_reply_markup(tg_id, 'reply_keyboard', cust_nos=cust_nos))
+
+            elif len(cust_nos) > 0:
+                inline_markup = types.InlineKeyboardMarkup(row_width=2)
+                btn_add= types.InlineKeyboardButton('Add', callback_data='Add')
+                btn_remove = types.InlineKeyboardButton('Remove', callback_data='Remove')
+
+                inline_markup.add(btn_add, btn_remove)
+
+                msg = bot.send_message(tg_id, ('- Tap on <b>Add</b> if you want to add <i>low balance update</i> for another customer no.\n'
+                                        '- Tap on <b>Remove</b> to remove a customer number from <i>low balance update</i>.'), reply_markup=inline_markup)
+
+                global message_id, chat_id
+                message_id = msg.id
+                chat_id = tg_id
+        else:
+            bot.send_message(tg_id, SELECTION_MESSAGE)
 
     except Exception:
         logger(traceback.format_exc())
+
 
 @bot.message_handler(commands=['notify_daily'])
 def notify_daily(message):
     try:
         global command_name
         command_name = 'notify_daily'
-        bot.send_message(message.chat.id, 'Enter a customer number.')
+
+        tg_id: int = message.chat.id
+
+        if doc_exists(tg_id):
+            cust_nos: list = get_cust_nos(tg_id, 'notify_daily')
+
+            if len(cust_nos) == 0:
+                bot.send_message(tg_id, SELECTION_MESSAGE, reply_markup=generate_reply_markup(tg_id, 'reply_keyboard', cust_nos=cust_nos))
+
+            elif len(cust_nos) > 0:
+                inline_markup = types.InlineKeyboardMarkup(row_width=2)
+                btn_add= types.InlineKeyboardButton('Add', callback_data='Add')
+                btn_remove = types.InlineKeyboardButton('Remove', callback_data='Remove')
+
+                inline_markup.add(btn_add, btn_remove)
+
+                msg = bot.send_message(tg_id, ('- Tap on <b>Add</b> if you want to add <i>daily balance update</i> for another customer no.\n'
+                                        '- Tap on <b>Remove</b> to remove a customer number from <i>daily balance update</i>.'), reply_markup=inline_markup)
+
+                global message_id, chat_id
+                message_id = msg.id
+                chat_id = tg_id
+        
+        else:
+            bot.send_message(tg_id, SELECTION_MESSAGE)
 
     except Exception:
         logger(traceback.format_exc())
 
 
-@bot.message_handler(commands=['last_recharge_default'])
-def last_rechrage_default(message):
+query_data = 'Add'
+query_data_2 = 'Add'
+
+@bot.callback_query_handler(func=lambda call: True)
+def process_callbacks(query):
+
+    if query.data == 'Add' and command_name == 'notify':
+        bot.delete_message(chat_id, message_id)
+        bot.send_message(chat_id, SELECTION_MESSAGE,
+                            reply_markup=generate_reply_markup(chat_id, 'reply_keyboard', field='presets'))
+
+    if query.data == 'Remove' and command_name == 'notify':
+        bot.edit_message_text('Select one from below <b>to remove</b> from <i>low balance notification</i>.',
+                                chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='notify'))
+
+        return
+
+    if query.data == 'Add' and command_name == 'notify_daily':
+        bot.delete_message(chat_id, message_id)
+        bot.send_message(chat_id, SELECTION_MESSAGE, 
+                        reply_markup=generate_reply_markup(chat_id, 'reply_keyboard', field='presets'))
+
+    if query.data == 'Remove' and command_name == 'notify_daily':
+        bot.edit_message_text('Select one from below <b>to remove</b> from <i>low balance notification</i>.',
+                                chat_id, message_id, reply_markup=generate_reply_markup(chat_id, 'inline_keyboard', field='notify_daily'))
+
+        return
+
+    if command_name == 'notify':
+        try:
+            cust_no = int(query.data)
+            remove_cust_no(chat_id, 'notify', query.data)
+            bot.edit_message_text(f'Customer no.: <b>{cust_no}</b> removed from <i>low balance notification</i>.', chat_id, message_id)
+
+        except:
+            global query_data; query_data = query.data
+
+    elif command_name == 'notify_daily':
+        try:
+            cust_no = int(query.data)
+            remove_cust_no(chat_id, 'notify_daily', query.data)
+            bot.edit_message_text(f'Customer no.: <b>{cust_no}</b> removed from <i>daily balance notification</i>.', chat_id, message_id)
+
+        except:
+            global query_data_2; query_data_2 = query.data
+
+
+@bot.message_handler(commands=['add_remove_presets'])
+def add_remove_presets(message):
     try:
         global command_name
-        command_name = 'last_recharge_default'
+        command_name = 'add_remove_presets'
 
-        tg_id = str(message.chat.id)
-        cust_nos = get_cust_nos(tg_id, 'presets')
+        tg_id: int = message.chat.id
 
-        if cust_nos == None:
-            bot.send_message(tg_id, 'Enter a customer number.  (This step is only for initialization)')
+        if doc_exists(tg_id):
+            bot.send_message(tg_id, '- Enter a customer number <b>to add</b> to presets.\n\n- Or select one from below <b>to remove</b>.', 
+                        reply_markup=generate_reply_markup(tg_id, 'reply_keyboard'))
         
         else:
-            cust_no = cust_nos[0]
-            msg = bot.send_message(tg_id, 'Getting data...')
-            response = message_formatter('recharge', cust_no)
+            bot.send_message(tg_id, '- Enter a customer number <b>to add</b> to presets.')
 
-            if response != False:
-                bot.edit_message_text(response, tg_id, msg.message_id)
-            else:
-                bot.edit_message_text('Please try again.', tg_id, msg.message_id)
 
     except Exception:
         logger(traceback.format_exc())
         try:
-            bot.send_message('Error occured. Try again after some time.', tg_id)
-        except Exception:
-            logger(traceback.format_exc())
-
-
-
-@bot.message_handler(commands=['balance_default'])
-def balance_default(message):
-    try:
-        global command_name
-        command_name = 'balance_default'
-
-        tg_id = str(message.chat.id)
-        cust_nos = get_cust_nos(tg_id, 'presets')
-
-        if cust_nos == None:
-            bot.send_message(tg_id, 'Enter a customer number.  (This step is only for initialization)')
-        
-        else:
-            cust_no = cust_nos[0]
-            msg = bot.send_message(tg_id, 'Getting data...')
-            response = message_formatter('balance', cust_no)
-
-            if response != False:
-                bot.edit_message_text(response, tg_id, msg.message_id)
-            else:
-                bot.edit_message_text('Please try again.', tg_id, msg.message_id)
-
-    except Exception:
-        logger(traceback.format_exc())
-        try:
-            bot.send_message('Error occured. Try again after some time.', tg_id)
+            bot.send_message(tg_id, 'Error occured. Try again after some time.')
         except Exception:
             logger(traceback.format_exc())
 
@@ -269,70 +394,71 @@ def balance_default(message):
 @bot.message_handler()
 def handle_all_messages(message):
     try:
-        if command_name == 'start':
-            bot.send_message(message.chat.id, starting_message)
-        
-        if command_name == 'balance' or command_name == 'recharge':
+        if check_input_validity(message.text) == True:
 
-            msg = bot.send_message(message.chat.id, 'Getting data...')
-            response = message_formatter(command_name, message.text)
+            if command_name == 'start':
+                bot.send_message(message.chat.id, STARTING_MESSAGE)
+            
 
-            if response != False:
-                bot.edit_message_text(response, message.chat.id, msg.message_id)
-            else:
-                bot.edit_message_text('Enter a valid customer number, or try again.', message.chat.id, msg.message_id)
+            if command_name == 'balance' or command_name == 'recharge_details':
 
+                msg = bot.send_message(message.chat.id, 'Getting data...')
+                response = message_formatter(command_name, message.text)
 
-        if command_name == 'notify':
-
-            tg_id = str(message.chat.id)
-
-            if not doc_exists(tg_id):
-                create_doc(message.chat)
-
-            if doc_exists(tg_id):
-                set_cust_no(tg_id, 'notify', message.text)
-
-            bot.send_message(message.chat.id, 'Setup success! You will get a message if remaining balance balance is less than ৳100.')
-        
-
-        if command_name == 'notify_daily':
-
-            tg_id = str(message.chat.id)
-
-            if not doc_exists(tg_id):
-                create_doc(message.chat)
-
-            if doc_exists(tg_id):
-                set_cust_no(tg_id, 'notify_daily', message.text)
-
-            bot.send_message(message.chat.id, 'Setup success! You will get a balance update eveyday at 06:00 AM.')
+                if response != False:
+                    bot.edit_message_text(response, message.chat.id, msg.message_id)
+                else:
+                    bot.edit_message_text('Enter a valid customer number, or try again.', message.chat.id, msg.message_id)
 
 
-        if command_name == 'last_recharge_default':
+            if command_name == 'notify':
 
-            tg_id = str(message.chat.id)
+                tg_id = str(message.chat.id)
 
-            if not doc_exists(tg_id):
-                create_doc(message.chat)
+                if query_data == 'Add':
+                    
+                    if not doc_exists(tg_id):
+                        create_doc(message.chat)
 
-            if doc_exists(tg_id):
-                set_cust_no(tg_id, 'presets', message.text)
+                    set_cust_no(tg_id, 'notify', message.text)
 
-            bot.send_message(message.chat.id, "Setup success! Just send the command /last_recharge_default next time to see last recharge history without entering customer no.")
+                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a message if remaining balance is less than ৳100, for customer no.: <b>{message.text}</b>')
+                
 
 
-        if command_name == 'balance_default':
+            if command_name == 'notify_daily':
 
-            tg_id = str(message.chat.id)
+                tg_id = str(message.chat.id)
 
-            if not doc_exists(tg_id):
-                create_doc(message.chat)
+                if query_data_2 == 'Add':
+                    
+                    if not doc_exists(tg_id):
+                        create_doc(message.chat)
 
-            if doc_exists(tg_id):
-                set_cust_no(tg_id, 'presets', message.text)
+                    set_cust_no(tg_id, 'notify_daily', message.text)
 
-            bot.send_message(message.chat.id, 'Just send the command /balance_default next time to see balance without entering customer no.')
+                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a balance update eveyday at 06:00 AM. for customer no.: <b>{message.text}</b>')
+
+
+            if command_name == 'add_remove_presets':
+
+                tg_id = str(message.chat.id)
+
+                if not doc_exists(tg_id):
+                    create_doc(message.chat)
+
+                cust_nos = get_cust_nos(tg_id, 'presets')
+                
+                if message.text in cust_nos:
+                    remove_cust_no(tg_id, 'presets', message.text)
+                    bot.send_message(tg_id, "Customer number removed from presets.")
+
+                else:
+                    set_cust_no(tg_id, 'presets', message.text)
+                    bot.send_message(tg_id, "Customer number added!\n\nJust send the command /balance or /recharge_details next time to see balance or last recharge details without entering customer no.\n\nYou can add more presets too.")
+
+        else:
+            bot.send_message(message.chat.id, 'Input not valid. Enter again.')
 
     except Exception:
         logger(traceback.format_exc())
@@ -349,37 +475,43 @@ def notifier():
 
         docs_notify = users.where('notify', u'!=', 'null').stream()
         for doc in docs_notify:
-            cust_no = doc.to_dict()['notify'][0]
+            
             tg_id = doc.to_dict()['tg_id']
+            cust_nos = doc.to_dict()['notify']
 
-            balance = data_collector.get_balance(cust_no=cust_no)
+            for cust_no in cust_nos:
 
-            if float(balance) < 100: 
-                response = message_formatter('low_balance', cust_no)
-                bot.send_message(tg_id, response)
+                balance = data_collector.get_balance(cust_no=cust_no)
 
-                sent_notify_to.append((cust_no, tg_id))
+                if float(balance) < 100: 
+                    response = message_formatter('low_balance', cust_no)
+                    bot.send_message(tg_id, response)
+
+                    sent_notify_to.append((cust_no, tg_id))
 
 
         docs_notify_daily = users.where('notify_daily', '!=', 'null').stream()
         for doc in docs_notify_daily:
-            cust_no = doc.to_dict()['notify_daily'][0]
-            tg_id = doc.to_dict()['tg_id']
 
-            if (cust_no, tg_id) not in sent_notify_to:
-                response = message_formatter('balance', cust_no)
-                bot.send_message(tg_id, response)
+            tg_id = doc.to_dict()['tg_id']
+            cust_nos = doc.to_dict()['notify_daily']
+
+            for cust_no in cust_nos:
+                if (cust_no, tg_id) not in sent_notify_to:
+                    response = message_formatter('balance', cust_no)
+                    bot.send_message(tg_id, response)
     
     except Exception:
         logger(traceback.format_exc())
 
 
 def notifier_time():
-    schedule.every().day.at("00:00").do(notifier)
+    schedule.every().day.at("13:22").do(notifier)
 
     while True:
         schedule.run_pending()
-        sleep(60)
+        sleep(1)
+
 try:
     bot_thread = Thread(target=bot.polling)
     bot_thread.start()
