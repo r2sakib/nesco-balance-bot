@@ -27,7 +27,7 @@ STARTING_MESSAGE = ("/balance - Check current balance\n"
                     "/notify_daily - Get balance update daily at 06:00 AM\n"
                     )
 
-SELECTION_MESSAGE = '• Enter a customer number.\n• Or select one from below. (Will be shown below if you have added persets.)'
+SELECTION_MESSAGE = '• Enter a customer number.\n\n• Or select one from below. (Will be shown below if you have added persets.)'
 
 
 @bot.message_handler(commands=['start', 'help'])
@@ -198,10 +198,11 @@ def add_remove_presets(message):
         command_name = 'add_remove_presets'
 
         tg_id: int = message.chat.id
+        cust_nos = get_cust_nos(tg_id, 'presets')
 
-        if doc_exists(tg_id):
+        if doc_exists(tg_id) and len(cust_nos) > 0:
             bot.send_message(tg_id, '• Enter a customer number <b>to add</b> to presets.\n\n• Or select one from below <b>to remove</b>.', 
-                        reply_markup=generate_reply_markup(tg_id, 'reply_keyboard'))
+                        reply_markup=generate_reply_markup(tg_id, 'reply_keyboard', cust_nos=cust_nos))
         
         else:
             bot.send_message(tg_id, '• Enter a customer number <b>to add</b> to presets.')
@@ -218,6 +219,9 @@ def add_remove_presets(message):
 @bot.message_handler()
 def handle_all_messages(message):
     try:
+        tg_id = str(message.chat.id)
+        remove_keyboard = types.ReplyKeyboardRemove()
+
         if check_input_validity(message.text) == True:
 
             if command_name == 'start':
@@ -226,18 +230,17 @@ def handle_all_messages(message):
 
             if command_name == 'balance' or command_name == 'recharge_details':
 
-                msg = bot.send_message(message.chat.id, 'Getting data...')
+                msg = bot.send_message(message.chat.id, 'Getting data...', reply_markup=remove_keyboard)
                 response = message_formatter(command_name, message.text)
 
                 if response != False:
-                    bot.edit_message_text(response, message.chat.id, msg.message_id)
+                    bot.delete_message(tg_id, msg.id)
+                    bot.send_message(message.chat.id, response, reply_markup=remove_keyboard)
                 else:
                     bot.edit_message_text('Enter a valid customer number, or try again.', message.chat.id, msg.message_id)
 
 
             if command_name == 'notify':
-
-                tg_id = str(message.chat.id)
 
                 if query_data == 'Add':
                     
@@ -246,13 +249,11 @@ def handle_all_messages(message):
 
                     set_cust_no(tg_id, 'notify', message.text)
 
-                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a message if remaining balance is less than ৳100, for customer no.: <b>{message.text}</b>')
-                
-
+                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a message if remaining balance is less than ৳100, for customer no.: <b>{message.text}</b>',
+                                    reply_markup=remove_keyboard)
+            
 
             if command_name == 'notify_daily':
-
-                tg_id = str(message.chat.id)
 
                 if query_data_2 == 'Add':
                     
@@ -261,12 +262,11 @@ def handle_all_messages(message):
 
                     set_cust_no(tg_id, 'notify_daily', message.text)
 
-                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a balance update eveyday at 06:00 AM. for customer no.: <b>{message.text}</b>')
+                    bot.send_message(message.chat.id, f'Setup success!\nYou will get a balance update eveyday at 06:00 AM. for customer no.: <b>{message.text}</b>',
+                                    reply_markup=remove_keyboard)
 
 
             if command_name == 'add_remove_presets':
-
-                tg_id = str(message.chat.id)
 
                 if not doc_exists(tg_id):
                     create_doc(message.chat)
@@ -275,11 +275,12 @@ def handle_all_messages(message):
                 
                 if message.text in cust_nos:
                     remove_cust_no(tg_id, 'presets', message.text)
-                    bot.send_message(tg_id, "Customer number removed from presets.")
+                    bot.send_message(tg_id, f'Customer number: <b>{message.text}</b> removed from presets.', reply_markup=remove_keyboard)
 
                 else:
                     set_cust_no(tg_id, 'presets', message.text)
-                    bot.send_message(tg_id, "Customer number added!\n\nJust send the command /balance or /recharge_details next time to see balance or last recharge details without entering customer no.\n\nYou can add more presets too.")
+                    bot.send_message(tg_id, f"Customer number: <b>{message.text}</b> added!\n\nJust send the command /balance or /recharge_details next time to see balance or last recharge details without entering customer no.\n\nYou can add more presets too.",
+                                    reply_markup=remove_keyboard)
 
         else:
             bot.send_message(message.chat.id, 'Input not valid. Enter again.')
