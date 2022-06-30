@@ -1,4 +1,5 @@
-import telebot
+# Python version = 3.10.4
+
 import os
 from threading import Thread
 from dotenv import load_dotenv
@@ -6,26 +7,33 @@ from datetime import datetime
 from time import sleep
 import traceback
 
-import data_collector 
-
+from telebot import TeleBot
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 
+import data_collector 
 
-creds = credentials.Certificate('toy-bank-bot-firebase-adminsdk.json')
+creds = credentials.Certificate('src/firebase-admin-sdk.json')
 firebase_admin.initialize_app(creds)
 db = firestore.client()
 users = db.collection(u'users')
 
 
 load_dotenv()
-API_KEY = os.environ['API_KEY']
-bot = telebot.TeleBot(API_KEY, parse_mode='HTML')
+TG_BOT_TOKEN = os.environ['TG_BOT_TOKEN']
+bot = TeleBot(TG_BOT_TOKEN, parse_mode='HTML')
 
 command_name = None
-starting_message = "/balance - Check current balance\n/balance_default - Check current balance with preset customer no.\n/last_recharge - Check last recharge details\n/last_recharge_default - Check last recharge details with preset customer no.\n/notify - Get balance update if balance is less than ৳100\n/notify_daily - Get balance update daily at 06:00 AM"
+starting_message = ("/balance - Check current balance\n"
+                    "/balance_default - Check current balance with preset customer no.\n"
+                    "/last_recharge - Check last recharge details\n"
+                    "/last_recharge_default - Check last recharge details with preset customer no.\n"
+                    "/notify - Get balance update if balance is less than ৳100\n"
+                    "/notify_daily - Get balance update daily at 06:00 AM\n"
+                    )
 
+print(type(starting_message), starting_message, sep='\n')
 
 def logger(log):
     with open('logs.md', 'a') as log_file:
@@ -40,13 +48,13 @@ def message_formatter(type: str, cust_no) -> str:
         try:
             info = data_collector.check_balance(cust_no)
 
-            message = f'''
-                <b><u>Balance info</u></b>
-    Customer no.:       <b>{info['cust_no']}</b>
-    Customer name:  <b>{info['cust_name']}</b>
-        
-    Remaining balance:   <b>৳{info['balance']}</b>
-    Updated on:   <b>{info['time']}</b>'''
+            message = (f"<b><u>Balance info</u></b>\n"
+                        f"  Customer no.:       <b>{info['cust_no']}</b>\n"
+                        f"  Customer name:  <b>{info['cust_name']}</b>\n\n"
+                            
+                        f"  Remaining balance: <b>৳{info['balance']}</b>\n"
+                        f"  Updated on: <b>{info['time']}</b>\n"
+                        )
 
             return message
         
@@ -57,18 +65,18 @@ def message_formatter(type: str, cust_no) -> str:
         try:
             info = data_collector.check_last_recharge(cust_no)
 
-            message = f'''
-                <b><u>Last recharge info</u></b>
-    Customer no.:       <b>{info['cust_no']}</b>
-    Customer name:  <b>{info['cust_name']}</b>
-    
-    Date:   <b>{info['info']['date']}</b>
-    Recharge amount:   <b>৳{info['info']['re_amount']}</b>
-    Energy amount:        <b>৳{info['info']['en_amount']}</b>
-    Unit (kWh):                  <b>{info['info']['unit']}</b>
-    Payment method:     <b>{info['info']['method']}</b>
-    Remote payment:     <b>{info['info']['remote']}</b>
-    Token: <b>{info['info']['token']}</b>'''
+            message = (f"<b><u>Last recharge info</u></b>\n"
+                        f"  Customer no.:       <b>{info['cust_no']}</b>\n"
+                        f"  Customer name:  <b>{info['cust_name']}</b>\n\n"
+                        
+                        f"  Date: <b>{info['info']['date']}</b>\n"
+                        f"  Recharge amount:   <b>৳{info['info']['re_amount']}</b>\n"
+                        f"  Energy amount:        <b>৳{info['info']['en_amount']}</b>\n"
+                        f"  Unit (kWh):                  <b>{info['info']['unit']}</b>\n"
+                        f"  Payment method:     <b>{info['info']['method']}</b>\n"
+                        f"  Remote payment:     <b>{info['info']['remote']}</b>\n"
+                        f"  Token: <b>{info['info']['token']}</b>\n"
+                        )
 
             return message
         
@@ -79,19 +87,18 @@ def message_formatter(type: str, cust_no) -> str:
         try:
             info = data_collector.check_balance(cust_no)
 
-            message = f'''
-        <b><u>LOW BALANCE</u></b>
-    Customer no.:       <b>{info['cust_no']}</b>
-    Customer name:  <b>{info['cust_name']}</b>
-        
-    Remaining balance:   <b>৳{info['balance']}</b>
-    Updated on:   <b>{info['time']}</b>'''
+            message = (f"<b><u>LOW BALANCE</u></b>\n"
+                        f"  Customer no.:       <b>{info['cust_no']}</b>\n"
+                        f"  Customer name:  <b>{info['cust_name']}</b>\n\n"
+                            
+                        f"  Remaining balance:   <b>৳{info['balance']}</b>\n"
+                        f"  Updated on:   <b>{info['time']}</b>\n"
+                        )
 
             return message
         
         except:
             return False
-
 
 
 def doc_exists(doc_id: str, doc_name='users'):
@@ -147,11 +154,11 @@ def set_cust_no(doc_id: str, field: str, cust_no: str):
 
 
 @bot.message_handler(commands=['start', 'help'])
-def start(message):
+def start_help(message):
     try:
         global command_name
         command_name = 'start'
-        bot.send_message(message.chat.id, starting_message)
+        bot.send_message(message.chat.id, starting_message, parse_mode=None)
 
     except Exception:
         logger(traceback.format_exc())
