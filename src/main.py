@@ -331,11 +331,11 @@ def notifier():
 
 
 def notifier_time():
-    schedule.every().day.at("13:22").do(notifier)
+    schedule.every().day.at("00:00").do(notifier)
 
     while True:
         schedule.run_pending()
-        sleep(1)
+        sleep(60)
 
 try:
     bot_thread = Thread(target=bot.polling)
