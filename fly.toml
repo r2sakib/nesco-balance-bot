@@ -1,0 +1,15 @@
+# fly.toml file generated for nesco-balance-bot on 2022-08-27T23:42:04+06:00
+
+app = "nesco-balance-bot"
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[build]
+  builder = "heroku/buildpacks:latest"
+
+[env]
+
+[experimental]
+  allowed_public_ports = []
+  auto_rollback = true
+
